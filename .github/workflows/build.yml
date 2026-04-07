@@ -37,17 +37,28 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: artix-dev.pyz
 
-      - name: Update rolling release
+      - name: Move latest tag to current commit
+        run: |
+          git tag -f latest
+          git push -f origin latest
+
+      - name: Delete existing release
+        run: gh release delete latest --yes 2>/dev/null || true
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Create rolling release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
           name: Latest Build
           body: |
-            Rolling release from master.
+            Rolling release from `${{ github.sha }}`.
 
             Download and run on the Artix live ISO:
             ```bash
