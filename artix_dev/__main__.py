@@ -10,7 +10,7 @@ from pathlib import Path
 from artix_dev.config import InstallConfig
 
 
-def _ensure_root() -> None:
+def _ensure_root(config_file: str | None = None) -> None:
     """Re-exec with sudo if not root. Exits if sudo fails."""
     if os.geteuid() == 0:
         return
@@ -24,8 +24,12 @@ def _ensure_root() -> None:
         if result.returncode != 0:
             print("Error: sudo authentication failed", file=sys.stderr)
             sys.exit(1)
-    # Re-exec ourselves with sudo, using python -m for consistency
-    os.execvp("sudo", ["sudo", sys.executable, "-m", "artix_dev"] + sys.argv[1:])
+    # Build the command to re-exec
+    # Strip any existing config file args and use the one we have
+    cmd_args = [a for a in sys.argv[1:] if not a.endswith(".toml")]
+    if config_file:
+        cmd_args.append(config_file)
+    os.execvp("sudo", ["sudo", sys.executable, "-m", "artix_dev"] + cmd_args)
 
 DEFAULT_CONFIG = Path("/root/artix-dev/config.toml")
 
@@ -102,10 +106,18 @@ def main() -> None:
                 cfg.save(save_path)
                 print(f"Config saved to {save_path}")
                 sys.exit(0)
-            config_file = None
+            # Save TUI config to temp file so sudo re-exec can find it
+            import tempfile
+            tmp = tempfile.NamedTemporaryFile(
+                mode="w", suffix=".toml", prefix="artix-dev-",
+                delete=False,
+            )
+            tmp.write(cfg.to_toml())
+            tmp.close()
+            config_file = tmp.name
 
         if not dry_run:
-            _ensure_root()
+            _ensure_root(config_file)
         from artix_dev.phase1 import run_phase1
         run_phase1(cfg, dry_run=dry_run, config_path=config_file)
 
@@ -114,10 +126,10 @@ def main() -> None:
         dry_run = "--dry-run" in rest
         rest = [a for a in rest if a != "--dry-run"]
 
-        cfg, _ = _load_config(rest)
+        cfg, config_file = _load_config(rest)
 
         if not dry_run:
-            _ensure_root()
+            _ensure_root(config_file)
         from artix_dev.phase2 import run_phase2
         run_phase2(cfg, dry_run=dry_run)
 
