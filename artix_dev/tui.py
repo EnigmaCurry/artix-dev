@@ -157,7 +157,7 @@ class ArtixInstaller(App):
 
     def _welcome_tab(self) -> ComposeResult:
         with VerticalScroll(id="welcome"):
-            yield Label("Welcome to the Artix Linux Installer", classes="title")
+            yield Label("Welcome to artix-dev", classes="title")
             yield Rule()
             yield Static(
                 "[italic]This is an unofficial community installer, not\n"
