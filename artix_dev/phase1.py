@@ -69,6 +69,7 @@ def setup_luks(cfg: InstallConfig) -> None:
 
     run("cryptsetup", "benchmark")
     run("cryptsetup",
+        "--batch-mode",
         "--verbose",
         "--type", luks.luks_type,
         "--cipher", luks.cipher,
@@ -385,6 +386,33 @@ def run_phase1(cfg: InstallConfig, dry_run: bool = False,
         for err in errors:
             print(f"Config error: {err}")
         die("Fix config errors before running install")
+
+    # Summary and confirmation
+    print()
+    print(f"  Hostname:   {cfg.system.hostname}")
+    print(f"  Disk:       {cfg.disk.device} ({cfg.disk.disk_type.value})")
+    print(f"  ESP:        {cfg.disk.esp_partition} ({cfg.disk.esp_size})")
+    print(f"  LUKS:       {cfg.disk.luks_partition} ({cfg.luks.cipher})")
+    print(f"  LVM:        boot={cfg.lvm.boot_size}, swap={cfg.lvm.swap_size}, root=remaining")
+    print(f"  Kernel:     {cfg.kernel_package}")
+    print(f"  Username:   {cfg.system.username}")
+    print(f"  Locale:     {cfg.system.locale}")
+    print(f"  Timezone:   {cfg.system.timezone}")
+    print(f"  SSH:        {cfg.system.ssh.value}")
+    if cfg.system.ssh_authorized_keys:
+        print(f"  SSH keys:   {len(cfg.system.ssh_authorized_keys)}")
+    features = ", ".join(f.value for f in sorted(cfg.features, key=lambda f: f.value))
+    print(f"  Features:   {features or 'none'}")
+    services = ", ".join(s.value for s in sorted(cfg.optional_services, key=lambda s: s.value))
+    print(f"  Services:   {services or 'none'}")
+    print()
+    print(f"  *** ALL DATA ON {cfg.disk.device} WILL BE DESTROYED ***")
+    print()
+
+    if not dry_run:
+        answer = input("  Type YES to proceed: ")
+        if answer != "YES":
+            die("Aborted by user")
 
     install_live_deps()
     partition_disk(cfg)
