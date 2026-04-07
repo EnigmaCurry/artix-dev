@@ -101,9 +101,10 @@ class DiskScreen(Screen):
             yield Rule()
             if self.disks:
                 with RadioSet(id="disk-list"):
-                    for d in self.disks:
+                    for i, d in enumerate(self.disks):
                         yield RadioButton(
                             f"{d['device']}  {d['size']}  {d['model']}",
+                            value=(i == 0),
                         )
             else:
                 yield Label("No disks detected.")
@@ -117,9 +118,6 @@ class DiskScreen(Screen):
             yield Rule()
             yield from _nav_buttons("next")
         yield Footer()
-
-    def on_mount(self) -> None:
-        self.query_one("#esp-size", Input).focus()
 
     @on(Button.Pressed, "#next")
     def next_screen(self) -> None:
@@ -645,14 +643,6 @@ class ArtixInstaller(App):
     }
     Checkbox, RadioButton {
         margin: 0 0 0 2;
-    }
-    RadioSet:focus-within > RadioButton.-on > .toggle--label {
-    }
-    RadioSet > RadioButton {
-        background: transparent;
-    }
-    RadioSet:focus-within > RadioButton.-highlight {
-        background: transparent;
     }
     #toml-preview {
         margin: 1 2;
