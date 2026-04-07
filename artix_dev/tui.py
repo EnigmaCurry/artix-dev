@@ -38,11 +38,11 @@ _SIZE_RE = re.compile(r'^\d+(\.\d+)?[KMGTkmgt]$')
 
 TABS = [
     ("disk", "Disk"),
-    ("encryption", "Encryption"),
     ("system", "System"),
     ("ssh", "SSH"),
     ("features", "Features"),
     ("extras", "Extras"),
+    ("advanced", "Advanced"),
     ("review", "Review"),
 ]
 
@@ -143,11 +143,11 @@ class ArtixInstaller(App):
                 )
             with ContentSwitcher(id="content", initial="disk"):
                 yield from self._disk_tab()
-                yield from self._encryption_tab()
                 yield from self._system_tab()
                 yield from self._ssh_tab()
                 yield from self._features_tab()
                 yield from self._extras_tab()
+                yield from self._advanced_tab()
                 yield from self._review_tab()
         yield Footer()
 
@@ -178,10 +178,23 @@ class ArtixInstaller(App):
                 id="esp-size",
             )
             yield Checkbox("Enable SSD TRIM", value=self.cfg.disk.trim, id="trim")
+            yield Rule()
+            yield Label("LVM boot size:")
+            yield Input(
+                value=self.cfg.lvm.boot_size,
+                placeholder="e.g. 1G",
+                id="boot-size",
+            )
+            yield Label("LVM swap size:")
+            yield Input(
+                value=self.cfg.lvm.swap_size,
+                placeholder="e.g. 16G (match RAM for hibernate)",
+                id="swap-size",
+            )
 
-    def _encryption_tab(self) -> ComposeResult:
-        with VerticalScroll(id="encryption"):
-            yield Label("Encryption Settings", classes="title")
+    def _advanced_tab(self) -> ComposeResult:
+        with VerticalScroll(id="advanced"):
+            yield Label("Advanced Encryption Settings", classes="title")
             yield Rule()
             yield Label("LUKS cipher:")
             yield Input(
@@ -206,19 +219,6 @@ class ArtixInstaller(App):
                 value=str(self.cfg.luks.iter_time),
                 placeholder="e.g. 10000",
                 id="iter-time",
-            )
-            yield Rule()
-            yield Label("LVM boot size:")
-            yield Input(
-                value=self.cfg.lvm.boot_size,
-                placeholder="e.g. 1G",
-                id="boot-size",
-            )
-            yield Label("LVM swap size:")
-            yield Input(
-                value=self.cfg.lvm.swap_size,
-                placeholder="e.g. 16G (match RAM for hibernate)",
-                id="swap-size",
             )
 
     def _system_tab(self) -> ComposeResult:
@@ -492,23 +492,23 @@ class ArtixInstaller(App):
 
         # Encryption
         if not self.query_one("#cipher", Input).value.strip():
-            errors.append("Encryption: cipher is required")
+            errors.append("Advanced: cipher is required")
         try:
             int(self.query_one("#key-size", Input).value)
         except ValueError:
-            errors.append("Encryption: key size must be a number")
+            errors.append("Advanced: key size must be a number")
         if not self.query_one("#hash", Input).value.strip():
-            errors.append("Encryption: hash is required")
+            errors.append("Advanced: hash is required")
         try:
             int(self.query_one("#iter-time", Input).value)
         except ValueError:
-            errors.append("Encryption: iteration time must be a number")
+            errors.append("Advanced: iteration time must be a number")
         boot = self.query_one("#boot-size", Input).value.strip()
         if not _valid_size(boot):
-            errors.append("Encryption: boot size must be valid (e.g. 1G)")
+            errors.append("Disk: boot size must be valid (e.g. 1G)")
         swap = self.query_one("#swap-size", Input).value.strip()
         if not _valid_size(swap):
-            errors.append("Encryption: swap size must be valid (e.g. 16G)")
+            errors.append("Disk: swap size must be valid (e.g. 16G)")
 
         # System
         hostname = self.query_one("#hostname", Input).value.strip()
