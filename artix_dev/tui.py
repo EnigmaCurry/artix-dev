@@ -118,6 +118,9 @@ class DiskScreen(Screen):
             yield from _nav_buttons("next")
         yield Footer()
 
+    def on_mount(self) -> None:
+        self.query_one("#esp-size", Input).focus()
+
     @on(Button.Pressed, "#next")
     def next_screen(self) -> None:
         if not self.disks:
