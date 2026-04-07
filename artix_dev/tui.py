@@ -185,9 +185,11 @@ class ArtixInstaller(App):
                 placeholder="e.g. 1G",
                 id="boot-size",
             )
+            has_swap = self.cfg.lvm.swap_size != "0"
+            yield Checkbox("Enable swap", value=has_swap, id="swap-enable")
             yield Label("LVM swap size:")
             yield Input(
-                value=self.cfg.lvm.swap_size,
+                value=self.cfg.lvm.swap_size if has_swap else "",
                 placeholder="e.g. 16G (match RAM for hibernate)",
                 id="swap-size",
             )
@@ -412,9 +414,13 @@ class ArtixInstaller(App):
         boot = self.query_one("#boot-size", Input).value.strip()
         if boot:
             cfg.lvm.boot_size = boot
-        swap = self.query_one("#swap-size", Input).value.strip()
-        if swap:
-            cfg.lvm.swap_size = swap
+        swap_enabled = self.query_one("#swap-enable", Checkbox).value
+        if swap_enabled:
+            swap = self.query_one("#swap-size", Input).value.strip()
+            if swap:
+                cfg.lvm.swap_size = swap
+        else:
+            cfg.lvm.swap_size = "0"
 
         # System
         hostname = self.query_one("#hostname", Input).value.strip()
@@ -506,9 +512,10 @@ class ArtixInstaller(App):
         boot = self.query_one("#boot-size", Input).value.strip()
         if not _valid_size(boot):
             errors.append("Disk: boot size must be valid (e.g. 1G)")
-        swap = self.query_one("#swap-size", Input).value.strip()
-        if not _valid_size(swap):
-            errors.append("Disk: swap size must be valid (e.g. 16G)")
+        if self.query_one("#swap-enable", Checkbox).value:
+            swap = self.query_one("#swap-size", Input).value.strip()
+            if not _valid_size(swap):
+                errors.append("Disk: swap size must be valid (e.g. 16G)")
 
         # System
         hostname = self.query_one("#hostname", Input).value.strip()

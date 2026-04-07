@@ -90,8 +90,9 @@ def setup_lvm(cfg: InstallConfig) -> None:
     run("vgcreate", "lvmSystem", "/dev/mapper/lvm-system")
     run("lvcreate", "--contiguous", "y", "--size", lvm.boot_size,
         "lvmSystem", "--name", "volBoot")
-    run("lvcreate", "--contiguous", "y", "--size", lvm.swap_size,
-        "lvmSystem", "--name", "volSwap")
+    if cfg.lvm.swap_enabled:
+        run("lvcreate", "--contiguous", "y", "--size", lvm.swap_size,
+            "lvmSystem", "--name", "volSwap")
     run("lvcreate", "--contiguous", "y", "--extents", "+100%FREE",
         "lvmSystem", "--name", "volRoot")
 
@@ -100,13 +101,15 @@ def format_partitions(cfg: InstallConfig) -> None:
     heading("Formatting partitions")
     run("mkfs.fat", "-F32", "-n", "ESP", cfg.disk.esp_partition)
     run("mkfs.ext4", "-L", "BOOT", "/dev/lvmSystem/volBoot")
-    run("mkswap", "-L", "SWAP", "/dev/lvmSystem/volSwap")
+    if cfg.lvm.swap_enabled:
+        run("mkswap", "-L", "SWAP", "/dev/lvmSystem/volSwap")
     run("mkfs.ext4", "-L", "ROOT", "/dev/lvmSystem/volRoot")
 
 
 def mount_partitions(cfg: InstallConfig) -> None:
     heading("Mounting partitions")
-    run("swapon", "/dev/lvmSystem/volSwap")
+    if cfg.lvm.swap_enabled:
+        run("swapon", "/dev/lvmSystem/volSwap")
     run("mount", "/dev/lvmSystem/volRoot", "/mnt")
     makedirs("/mnt/boot", exist_ok=True)
     run("mount", "/dev/lvmSystem/volBoot", "/mnt/boot")
@@ -223,10 +226,16 @@ def chroot_disable_xon_xoff() -> None:
 
 def chroot_configure_mkinitcpio(cfg: InstallConfig) -> None:
     heading("Configuring mkinitcpio")
-    hooks = (
-        "HOOKS=(base udev autodetect microcode modconf block "
-        "encrypt keyboard keymap consolefont lvm2 resume filesystems fsck)"
-    )
+    if cfg.lvm.swap_enabled:
+        hooks = (
+            "HOOKS=(base udev autodetect microcode modconf block "
+            "encrypt keyboard keymap consolefont lvm2 resume filesystems fsck)"
+        )
+    else:
+        hooks = (
+            "HOOKS=(base udev autodetect microcode modconf block "
+            "encrypt keyboard keymap consolefont lvm2 filesystems fsck)"
+        )
     run_shell(
         f"sed -i 's/^HOOKS=.*/{hooks}/' /mnt/etc/mkinitcpio.conf"
     )
@@ -239,15 +248,24 @@ def chroot_configure_grub(cfg: InstallConfig) -> None:
     grub = cfg.grub
     discard = ":allow-discards" if cfg.disk.trim else ""
 
-    # Get UUIDs from inside the chroot (devices are visible)
-    run_shell(
-        f'LUKS_UUID=$(blkid -s UUID -o value {luks_part}) && '
-        f'SWAP_UUID=$(blkid -s UUID -o value /dev/lvmSystem/volSwap) && '
-        f'sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT='
-        f'\\"cryptdevice=UUID=${{LUKS_UUID}}:lvm-system{discard} '
-        f'loglevel=3 quiet resume=UUID=${{SWAP_UUID}} net.ifnames=0\\"/" '
-        f'/mnt/etc/default/grub'
-    )
+    # Get UUIDs and build kernel command line
+    if cfg.lvm.swap_enabled:
+        run_shell(
+            f'LUKS_UUID=$(blkid -s UUID -o value {luks_part}) && '
+            f'SWAP_UUID=$(blkid -s UUID -o value /dev/lvmSystem/volSwap) && '
+            f'sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT='
+            f'\\"cryptdevice=UUID=${{LUKS_UUID}}:lvm-system{discard} '
+            f'loglevel=3 quiet resume=UUID=${{SWAP_UUID}} net.ifnames=0\\"/" '
+            f'/mnt/etc/default/grub'
+        )
+    else:
+        run_shell(
+            f'LUKS_UUID=$(blkid -s UUID -o value {luks_part}) && '
+            f'sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT='
+            f'\\"cryptdevice=UUID=${{LUKS_UUID}}:lvm-system{discard} '
+            f'loglevel=3 quiet net.ifnames=0\\"/" '
+            f'/mnt/etc/default/grub'
+        )
     append_file("/mnt/etc/default/grub", 'GRUB_ENABLE_CRYPTODISK="y"\n')
     run_shell(
         f"sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=\"{grub.timeout}\"/' "
@@ -405,7 +423,8 @@ def run_phase1(cfg: InstallConfig, dry_run: bool = False,
     print(f"  Disk:       {cfg.disk.device} ({cfg.disk.disk_type.value})")
     print(f"  ESP:        {cfg.disk.esp_partition} ({cfg.disk.esp_size})")
     print(f"  LUKS:       {cfg.disk.luks_partition} ({cfg.luks.cipher})")
-    print(f"  LVM:        boot={cfg.lvm.boot_size}, swap={cfg.lvm.swap_size}, root=remaining")
+    swap_desc = cfg.lvm.swap_size if cfg.lvm.swap_enabled else "disabled"
+    print(f"  LVM:        boot={cfg.lvm.boot_size}, swap={swap_desc}, root=remaining")
     print(f"  Kernel:     {cfg.kernel_package}")
     print(f"  Username:   {cfg.system.username}")
     print(f"  Locale:     {cfg.system.locale}")

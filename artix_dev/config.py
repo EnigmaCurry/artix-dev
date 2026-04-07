@@ -97,6 +97,10 @@ class LvmConfig:
         if not self.swap_size:
             self.swap_size = _detect_ram_size()
 
+    @property
+    def swap_enabled(self) -> bool:
+        return self.swap_size != "0"
+
 
 @dataclass
 class GrubConfig:
