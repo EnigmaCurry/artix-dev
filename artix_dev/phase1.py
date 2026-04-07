@@ -328,6 +328,9 @@ def chroot_configure_ssh(cfg: InstallConfig) -> None:
     username = cfg.system.username
     home = f"/mnt/home/{username}"
 
+    # Copy host keys from live ISO so fingerprint survives reboot
+    run_shell("cp -p /etc/ssh/ssh_host_* /mnt/etc/ssh/")
+
     # Install authorized keys
     ssh_dir = f"{home}/.ssh"
     makedirs(ssh_dir, mode=0o700, exist_ok=True)
