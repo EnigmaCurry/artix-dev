@@ -12,9 +12,21 @@ def usage() -> None:
     print("Usage: artix-dev <command> [config.toml]")
     print()
     print("Commands:")
+    print("  render <config.toml>    Generate standalone bash install script")
     print("  install <config.toml>   Run Phase 1 installation from live USB")
     print("  dump-config             Print default config to stdout")
     sys.exit(1)
+
+
+def load_config(args: list[str]) -> InstallConfig:
+    if len(args) < 2:
+        print("Error: command requires a config file path", file=sys.stderr)
+        usage()
+    config_path = Path(args[1])
+    if not config_path.exists():
+        print(f"Error: {config_path} not found", file=sys.stderr)
+        sys.exit(1)
+    return InstallConfig.load(config_path)
 
 
 def main() -> None:
@@ -27,16 +39,13 @@ def main() -> None:
     if command == "dump-config":
         print(InstallConfig().to_toml())
 
-    elif command == "install":
-        if len(args) < 2:
-            print("Error: install requires a config file path", file=sys.stderr)
-            usage()
-        config_path = Path(args[1])
-        if not config_path.exists():
-            print(f"Error: {config_path} not found", file=sys.stderr)
-            sys.exit(1)
+    elif command == "render":
+        cfg = load_config(args)
+        from artix_dev.render import render_phase1
+        print(render_phase1(cfg))
 
-        cfg = InstallConfig.load(config_path)
+    elif command == "install":
+        cfg = load_config(args)
         from artix_dev.phase1 import run_phase1
         run_phase1(cfg)
 
