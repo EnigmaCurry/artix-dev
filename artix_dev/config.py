@@ -73,11 +73,29 @@ class LuksConfig:
     luks_type: str = "luks1"  # luks1 required for GRUB encrypted /boot
 
 
+def _detect_ram_size() -> str:
+    """Detect system RAM and return as a size string (e.g. '16G')."""
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("MemTotal:"):
+                    kb = int(line.split()[1])
+                    gb = round(kb / 1024 / 1024)
+                    return f"{max(gb, 1)}G"
+    except OSError:
+        pass
+    return "16G"
+
+
 @dataclass
 class LvmConfig:
     boot_size: str = "1G"
-    swap_size: str = "16G"
+    swap_size: str = ""
     # root gets the remaining space automatically
+
+    def __post_init__(self) -> None:
+        if not self.swap_size:
+            self.swap_size = _detect_ram_size()
 
 
 @dataclass
