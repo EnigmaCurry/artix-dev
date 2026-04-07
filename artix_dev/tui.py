@@ -36,7 +36,15 @@ from artix_dev.config import (
     Kernel,
     OptionalService,
     SshPolicy,
+    _parse_size,
 )
+
+_SIZE_RE = re.compile(r'^\d+(\.\d+)?[KMGTkmgt]$')
+
+
+def _valid_size(value: str) -> bool:
+    """Check if a string is a valid size like '1G', '512M'."""
+    return bool(_SIZE_RE.match(value.strip()))
 
 
 def _list_disks() -> list[dict]:
@@ -102,11 +110,15 @@ class DiskScreen(Screen):
             yield Label("\nDevice path:")
             yield Input(
                 value="",
-                placeholder="Select a disk above or type a device path",
+                placeholder="/dev/nvme0n1, /dev/vda, /dev/sda, ...",
                 id="device",
             )
             yield Label("ESP size:")
-            yield Input(value=self.cfg.disk.esp_size, id="esp-size")
+            yield Input(
+                value=self.cfg.disk.esp_size,
+                placeholder="e.g. 1G, 512M",
+                id="esp-size",
+            )
             yield Checkbox("Enable SSD TRIM", value=self.cfg.disk.trim, id="trim")
             yield Rule()
             yield from _nav_buttons("next")
@@ -129,6 +141,9 @@ class DiskScreen(Screen):
             return
         if not esp:
             self.notify("ESP size is required", severity="error")
+            return
+        if not _valid_size(esp):
+            self.notify("ESP size must be a valid size (e.g. 1G, 512M)", severity="error")
             return
         self.cfg.disk.device = device
         self.cfg.disk.esp_size = esp
@@ -153,18 +168,42 @@ class LuksScreen(Screen):
             yield Label("Encryption Settings", classes="title")
             yield Rule()
             yield Label("LUKS cipher:")
-            yield Input(value=self.cfg.luks.cipher, id="cipher")
-            yield Label("Key size:")
-            yield Input(value=str(self.cfg.luks.key_size), id="key-size")
+            yield Input(
+                value=self.cfg.luks.cipher,
+                placeholder="e.g. serpent-xts-plain64, aes-xts-plain64",
+                id="cipher",
+            )
+            yield Label("Key size (bits):")
+            yield Input(
+                value=str(self.cfg.luks.key_size),
+                placeholder="e.g. 256, 512",
+                id="key-size",
+            )
             yield Label("Hash:")
-            yield Input(value=self.cfg.luks.hash, id="hash")
+            yield Input(
+                value=self.cfg.luks.hash,
+                placeholder="e.g. sha512, sha256",
+                id="hash",
+            )
             yield Label("Iteration time (ms):")
-            yield Input(value=str(self.cfg.luks.iter_time), id="iter-time")
+            yield Input(
+                value=str(self.cfg.luks.iter_time),
+                placeholder="e.g. 10000",
+                id="iter-time",
+            )
             yield Rule()
             yield Label("LVM boot size:")
-            yield Input(value=self.cfg.lvm.boot_size, id="boot-size")
+            yield Input(
+                value=self.cfg.lvm.boot_size,
+                placeholder="e.g. 1G",
+                id="boot-size",
+            )
             yield Label("LVM swap size:")
-            yield Input(value=self.cfg.lvm.swap_size, id="swap-size")
+            yield Input(
+                value=self.cfg.lvm.swap_size,
+                placeholder="e.g. 16G (match RAM for hibernate)",
+                id="swap-size",
+            )
             yield Rule()
             yield from _nav_buttons("prev", "next")
         yield Footer()
@@ -177,17 +216,32 @@ class LuksScreen(Screen):
         iter_time = self.query_one("#iter-time", Input).value.strip()
         boot = self.query_one("#boot-size", Input).value.strip()
         swap = self.query_one("#swap-size", Input).value.strip()
-        if not all([cipher, key_size, hash_val, iter_time, boot, swap]):
-            self.notify("All fields are required", severity="error")
+        if not cipher:
+            self.notify("LUKS cipher is required", severity="error")
+            return
+        if not hash_val:
+            self.notify("Hash is required", severity="error")
             return
         try:
-            self.cfg.luks.key_size = int(key_size)
-            self.cfg.luks.iter_time = int(iter_time)
+            int(key_size)
         except ValueError:
-            self.notify("Key size and iteration time must be numbers", severity="error")
+            self.notify("Key size must be a number (bits)", severity="error")
+            return
+        try:
+            int(iter_time)
+        except ValueError:
+            self.notify("Iteration time must be a number (ms)", severity="error")
+            return
+        if not _valid_size(boot):
+            self.notify("Boot size must be a valid size (e.g. 1G)", severity="error")
+            return
+        if not _valid_size(swap):
+            self.notify("Swap size must be a valid size (e.g. 16G)", severity="error")
             return
         self.cfg.luks.cipher = cipher
+        self.cfg.luks.key_size = int(key_size)
         self.cfg.luks.hash = hash_val
+        self.cfg.luks.iter_time = int(iter_time)
         self.cfg.lvm.boot_size = boot
         self.cfg.lvm.swap_size = swap
         self.app.push_screen(SystemScreen(self.cfg))
@@ -213,15 +267,35 @@ class SystemScreen(Screen):
             yield Label("System Configuration", classes="title")
             yield Rule()
             yield Label("Hostname:")
-            yield Input(value=self.cfg.system.hostname, id="hostname")
+            yield Input(
+                value=self.cfg.system.hostname,
+                placeholder="e.g. artix, mybox, thinkpad",
+                id="hostname",
+            )
             yield Label("Username:")
-            yield Input(value=self.cfg.system.username, id="username")
+            yield Input(
+                value=self.cfg.system.username,
+                placeholder="e.g. user, alice (lowercase, not root)",
+                id="username",
+            )
             yield Label("Locale:")
-            yield Input(value=self.cfg.system.locale, id="locale")
+            yield Input(
+                value=self.cfg.system.locale,
+                placeholder="e.g. en_US.UTF-8",
+                id="locale",
+            )
             yield Label("Timezone:")
-            yield Input(value=self.cfg.system.timezone, id="timezone")
+            yield Input(
+                value=self.cfg.system.timezone,
+                placeholder="e.g. US/Mountain, America/New_York, UTC",
+                id="timezone",
+            )
             yield Label("Tmpfs size (/tmp):")
-            yield Input(value=self.cfg.system.tmpfs_size, id="tmpfs-size")
+            yield Input(
+                value=self.cfg.system.tmpfs_size,
+                placeholder="e.g. 8G (half of RAM is typical)",
+                id="tmpfs-size",
+            )
             yield Checkbox(
                 "Remap Caps Lock to Control",
                 value=self.cfg.system.caps_lock_remap,
@@ -245,6 +319,7 @@ class SystemScreen(Screen):
         username = self.query_one("#username", Input).value.strip()
         locale = self.query_one("#locale", Input).value.strip()
         timezone = self.query_one("#timezone", Input).value.strip()
+        tmpfs = self.query_one("#tmpfs-size", Input).value.strip()
         if not hostname:
             self.notify("Hostname is required", severity="error")
             return
@@ -266,11 +341,14 @@ class SystemScreen(Screen):
         if not timezone:
             self.notify("Timezone is required", severity="error")
             return
+        if not _valid_size(tmpfs):
+            self.notify("Tmpfs size must be a valid size (e.g. 8G)", severity="error")
+            return
         self.cfg.system.hostname = hostname
         self.cfg.system.username = username
         self.cfg.system.locale = locale
         self.cfg.system.timezone = timezone
-        self.cfg.system.tmpfs_size = self.query_one("#tmpfs-size", Input).value
+        self.cfg.system.tmpfs_size = tmpfs
         self.cfg.system.caps_lock_remap = self.query_one("#capslock", Checkbox).value
         kernel_set = self.query_one("#kernel", RadioSet)
         if kernel_set.pressed_index >= 0:
@@ -312,9 +390,10 @@ class SshScreen(Screen):
             yield Rule()
             yield Label("Authorized public keys (one per line):")
             yield TextArea(
-                "\n".join(self.cfg.system.ssh_authorized_keys),
+                "\n".join(self.cfg.system.ssh_authorized_keys) or "",
                 id="ssh-keys",
             )
+            yield Label("Paste ssh-ed25519, ssh-rsa, or ecdsa keys", classes="help")
             yield Rule()
             yield from _nav_buttons("prev", "next")
         yield Footer()
@@ -423,14 +502,30 @@ class SwayHomeScreen(Screen):
             yield Label("sway-home & GRUB Settings", classes="title")
             yield Rule()
             yield Label("sway-home git repo:")
-            yield Input(value=self.cfg.sway_home.repo, id="repo")
+            yield Input(
+                value=self.cfg.sway_home.repo,
+                placeholder="e.g. https://github.com/user/sway-home",
+                id="repo",
+            )
             yield Label("Clone path:")
-            yield Input(value=self.cfg.sway_home.clone_path, id="clone-path")
+            yield Input(
+                value=self.cfg.sway_home.clone_path,
+                placeholder="e.g. ~/git/vendor/enigmacurry/sway-home",
+                id="clone-path",
+            )
             yield Rule()
             yield Label("GRUB timeout (seconds):")
-            yield Input(value=str(self.cfg.grub.timeout), id="grub-timeout")
+            yield Input(
+                value=str(self.cfg.grub.timeout),
+                placeholder="e.g. 15",
+                id="grub-timeout",
+            )
             yield Label("GRUB graphics mode:")
-            yield Input(value=self.cfg.grub.gfxmode, id="grub-gfxmode")
+            yield Input(
+                value=self.cfg.grub.gfxmode,
+                placeholder="e.g. auto, 1920x1080",
+                id="grub-gfxmode",
+            )
             yield Rule()
             yield from _nav_buttons("prev", "next")
         yield Footer()
@@ -438,14 +533,26 @@ class SwayHomeScreen(Screen):
     @on(Button.Pressed, "#next")
     def next_screen(self) -> None:
         timeout = self.query_one("#grub-timeout", Input).value.strip()
+        gfxmode = self.query_one("#grub-gfxmode", Input).value.strip()
+        repo = self.query_one("#repo", Input).value.strip()
+        clone_path = self.query_one("#clone-path", Input).value.strip()
         try:
             self.cfg.grub.timeout = int(timeout)
         except ValueError:
             self.notify("GRUB timeout must be a number", severity="error")
             return
-        self.cfg.sway_home.repo = self.query_one("#repo", Input).value
-        self.cfg.sway_home.clone_path = self.query_one("#clone-path", Input).value
-        self.cfg.grub.gfxmode = self.query_one("#grub-gfxmode", Input).value
+        if not gfxmode:
+            self.notify("GRUB graphics mode is required", severity="error")
+            return
+        if not repo:
+            self.notify("sway-home repo is required", severity="error")
+            return
+        if not clone_path:
+            self.notify("Clone path is required", severity="error")
+            return
+        self.cfg.sway_home.repo = repo
+        self.cfg.sway_home.clone_path = clone_path
+        self.cfg.grub.gfxmode = gfxmode
         self.app.push_screen(ReviewScreen(self.cfg))
 
     @on(Button.Pressed, "#prev")
@@ -521,6 +628,10 @@ class ArtixInstaller(App):
     }
     .error {
         color: $error;
+    }
+    .help {
+        color: $text-muted;
+        margin: 0 0 1 0;
     }
     Button {
         margin: 1 1;
