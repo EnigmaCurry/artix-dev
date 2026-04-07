@@ -20,6 +20,10 @@ build repo='':
     python3 -m zipapp build/app -o artix-dev.pyz -p "/usr/bin/env python3" -m "artix_dev.__main__:main"
     @echo "Built artix-dev.pyz ($(wc -c < artix-dev.pyz) bytes)"
 
+# Run artix-dev with arguments
+run *args:
+    uv run python -m artix_dev {{args}}
+
 # Dry-run install to show what would be executed
 dry-run config='examples/nvme-fde.toml':
     uv run python -m artix_dev install --dry-run {{config}}
