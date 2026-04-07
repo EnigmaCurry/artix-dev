@@ -1,5 +1,5 @@
 # List available recipes
-default:
+help:
     @just --list
 
 # Run tests
