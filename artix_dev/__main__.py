@@ -2,10 +2,30 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
 import sys
 from pathlib import Path
 
 from artix_dev.config import InstallConfig
+
+
+def _ensure_root() -> None:
+    """Re-exec with sudo if not root. Exits if sudo fails."""
+    if os.geteuid() == 0:
+        return
+    # Verify sudo works before re-exec
+    result = subprocess.run(
+        ["sudo", "-n", "true"], capture_output=True,
+    )
+    if result.returncode != 0:
+        # sudo needs a password — let it prompt
+        result = subprocess.run(["sudo", "true"])
+        if result.returncode != 0:
+            print("Error: sudo authentication failed", file=sys.stderr)
+            sys.exit(1)
+    # Re-exec ourselves with sudo
+    os.execvp("sudo", ["sudo"] + sys.argv)
 
 DEFAULT_CONFIG = Path("/root/artix-dev/config.toml")
 
@@ -84,6 +104,8 @@ def main() -> None:
                 sys.exit(0)
             config_file = None
 
+        if not dry_run:
+            _ensure_root()
         from artix_dev.phase1 import run_phase1
         run_phase1(cfg, dry_run=dry_run, config_path=config_file)
 
@@ -94,6 +116,8 @@ def main() -> None:
 
         cfg, _ = _load_config(rest)
 
+        if not dry_run:
+            _ensure_root()
         from artix_dev.phase2 import run_phase2
         run_phase2(cfg, dry_run=dry_run)
 
