@@ -1,0 +1,36 @@
+# Artix Linux with full disk encryption on NVMe SSD
+# ThinkPad X1 Carbon / similar ultrabook
+
+[disk]
+device = "/dev/nvme0n1"
+type = "nvme"
+
+[luks]
+cipher = "serpent-xts-plain64"
+key_size = 512
+hash = "sha512"
+iter_time = 10000
+luks_type = "luks1"
+
+[lvm]
+boot_size = "1G"
+swap_size = "16G"
+
+[system]
+hostname = "artix"
+locale = "en_US.UTF-8"
+timezone = "US/Mountain"
+username = "user"
+kernel = "linux-hardened"
+caps_lock_remap = true
+tmpfs_size = "8G"
+
+[sway_home]
+repo = "https://github.com/EnigmaCurry/sway-home"
+clone_path = "~/git/vendor/enigmacurry/sway-home"
+
+[features]
+enable = ["desktop", "flatpak", "nix", "podman", "sway_home"]
+
+[services]
+enable = ["acpid", "cronie", "ntpd", "syslog-ng"]
