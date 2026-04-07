@@ -12,7 +12,7 @@ build repo='':
     mkdir -p build/app
     cp -r artix_dev build/app/
     # Stamp version with git SHA and repo URL
-    printf 'VERSION = "%s"\nREPO = "%s"\n' "$(git rev-parse --short HEAD)" "{{ if repo != "" { repo } else { "https://github.com/EnigmaCurry/artix-dev" } }}" > build/app/artix_dev/_version.py
+    printf 'VERSION = "%s"\nREPO = "%s"\nBUILD_TIME = "%s"\n' "$(git rev-parse --short HEAD)" "{{repo}}" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" > build/app/artix_dev/_version.py
     # Install runtime deps (if any) into the bundle
     uv export --no-dev --no-emit-project -o build/requirements.txt 2>/dev/null && \
         uv pip install --target build/app -r build/requirements.txt 2>/dev/null || true

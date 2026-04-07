@@ -26,8 +26,13 @@ def main() -> None:
     command = args[0]
 
     if command == "--version":
-        from artix_dev._version import REPO, VERSION
-        print(f"artix-dev {VERSION} ({REPO})")
+        from artix_dev._version import BUILD_TIME, REPO, VERSION
+        parts = [f"artix-dev {VERSION}"]
+        if REPO:
+            parts.append(f"({REPO})")
+        if BUILD_TIME:
+            parts.append(f"built {BUILD_TIME}")
+        print(" ".join(parts))
 
     elif command == "dump-config":
         print(InstallConfig().to_toml())
