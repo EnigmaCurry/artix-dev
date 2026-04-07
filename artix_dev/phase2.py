@@ -306,7 +306,6 @@ def setup_sway_home(cfg: InstallConfig) -> None:
         run_as_user(username,
                     "git", "clone", cfg.sway_home.repo, clone_path)
         run_as_user(username,
-                    "bash", "-c",
                     f"cd {clone_path} && just hm-install")
 
     # Fix ownership of nix config
