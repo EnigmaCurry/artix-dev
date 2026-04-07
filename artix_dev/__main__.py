@@ -95,20 +95,24 @@ def main() -> None:
         if rest:
             cfg, config_file = _load_config(rest)
         else:
-            # Load previous config if it exists
-            saved = Path("artix-dev.toml")
-            prev_cfg = InstallConfig.load(saved) if saved.exists() else None
             from artix_dev.tui import run_tui
-            result = run_tui(prev_cfg)
-            if result is None:
-                print("Aborted.")
-                sys.exit(1)
-            action, cfg = result
-            # Always save for next run
-            cfg.save(saved)
-            if action == "save":
-                print(f"Config saved to {saved}")
-                sys.exit(0)
+            saved = Path("artix-dev.toml")
+            while True:
+                prev_cfg = InstallConfig.load(saved) if saved.exists() else None
+                saved_str = str(saved) if saved.exists() else None
+                result = run_tui(prev_cfg, config_path=saved_str)
+                if result is None:
+                    print("Aborted.")
+                    sys.exit(1)
+                action, cfg = result
+                if action == "reset":
+                    continue  # re-launch TUI with fresh config
+                # Save for next run
+                cfg.save(saved)
+                if action == "save":
+                    print(f"Config saved to {saved}")
+                    sys.exit(0)
+                break  # action == "install"
             # Save TUI config to temp file so sudo re-exec can find it
             import tempfile
             tmp = tempfile.NamedTemporaryFile(

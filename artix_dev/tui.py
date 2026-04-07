@@ -127,9 +127,11 @@ class ArtixInstaller(App):
     """
     TITLE = "artix-dev installer"
 
-    def __init__(self, cfg: InstallConfig | None = None) -> None:
+    def __init__(self, cfg: InstallConfig | None = None,
+                 config_path: str | None = None) -> None:
         super().__init__()
         self.cfg = cfg or InstallConfig()
+        self.config_path = config_path
         self.result: tuple[str, InstallConfig] | None = None
         self.disks = _list_disks()
 
@@ -185,6 +187,16 @@ class ArtixInstaller(App):
                 "\n"
                 "[bold]Ctrl+Q[/] to exit at any time.\n"
             )
+            if self.config_path and os.path.exists(self.config_path):
+                yield Rule()
+                yield Static(
+                    f"Loaded saved config: [bold]{self.config_path}[/]"
+                )
+                yield Button(
+                    "Delete Config & Reset",
+                    variant="error",
+                    id="delete-config",
+                )
             yield from self._tab_nav()
 
     def _disk_tab(self) -> ComposeResult:
@@ -637,6 +649,13 @@ class ArtixInstaller(App):
             if next_key == "review":
                 self._update_review()
 
+    @on(Button.Pressed, "#delete-config")
+    def do_delete_config(self) -> None:
+        if self.config_path and os.path.exists(self.config_path):
+            os.remove(self.config_path)
+        self.result = ("reset", InstallConfig())
+        self.exit()
+
     @on(Button.Pressed, "#install")
     def do_install(self) -> None:
         errors = self._validate_all()
@@ -652,7 +671,8 @@ class ArtixInstaller(App):
         self.exit()
 
 
-def run_tui(cfg: InstallConfig | None = None) -> tuple[str, InstallConfig] | None:
-    app = ArtixInstaller(cfg)
+def run_tui(cfg: InstallConfig | None = None,
+            config_path: str | None = None) -> tuple[str, InstallConfig] | None:
+    app = ArtixInstaller(cfg, config_path=config_path)
     app.run()
     return app.result
