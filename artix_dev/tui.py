@@ -646,6 +646,14 @@ class ArtixInstaller(App):
     Checkbox, RadioButton {
         margin: 0 0 0 2;
     }
+    RadioSet:focus-within > RadioButton.-on > .toggle--label {
+    }
+    RadioSet > RadioButton {
+        background: transparent;
+    }
+    RadioSet:focus-within > RadioButton.-highlight {
+        background: transparent;
+    }
     #toml-preview {
         margin: 1 2;
         padding: 1 2;
