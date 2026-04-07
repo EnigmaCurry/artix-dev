@@ -42,8 +42,10 @@ def main() -> None:
         dry_run = "--dry-run" in rest
         rest = [a for a in rest if a != "--dry-run"]
 
+        config_file: str | None = None
         if rest:
-            config_path = Path(rest[0])
+            config_file = rest[0]
+            config_path = Path(config_file)
             if not config_path.exists():
                 print(f"Error: {config_path} not found", file=sys.stderr)
                 sys.exit(1)
@@ -55,7 +57,7 @@ def main() -> None:
             sys.exit(1)
 
         from artix_dev.phase1 import run_phase1
-        run_phase1(cfg, dry_run=dry_run)
+        run_phase1(cfg, dry_run=dry_run, config_path=config_file)
 
     else:
         print(f"Unknown command: {command}", file=sys.stderr)

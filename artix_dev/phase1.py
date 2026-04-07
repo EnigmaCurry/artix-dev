@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import sys
+from pathlib import Path
 
 from artix_dev.config import InstallConfig, OptionalService, SshPolicy
 from artix_dev.run import (
@@ -349,6 +351,16 @@ def chroot_configure_ssh(cfg: InstallConfig) -> None:
         )
 
 
+def copy_artix_dev(cfg: InstallConfig, config_path: str | None, script_path: str | None) -> None:
+    heading("Copying artix-dev to installed system")
+    makedirs("/mnt/root/artix-dev", exist_ok=True)
+    if script_path and os.path.isfile(script_path):
+        run("cp", script_path, "/mnt/root/artix-dev/artix-dev.pyz")
+    write_file("/mnt/root/artix-dev/config.toml", cfg.to_toml())
+    if config_path and os.path.isfile(config_path):
+        run("cp", config_path, "/mnt/root/artix-dev/config.orig.toml")
+
+
 def unmount_and_finish() -> None:
     heading("Unmounting and finishing")
     run("umount", "-R", "/mnt")
@@ -359,7 +371,8 @@ def unmount_and_finish() -> None:
     print("\nInstallation complete. You may now reboot.")
 
 
-def run_phase1(cfg: InstallConfig, dry_run: bool = False) -> None:
+def run_phase1(cfg: InstallConfig, dry_run: bool = False,
+               config_path: str | None = None) -> None:
     """Execute the full Phase 1 installation from the live USB."""
     import artix_dev.run as run_mod
     run_mod.DRY_RUN = dry_run
@@ -399,5 +412,9 @@ def run_phase1(cfg: InstallConfig, dry_run: bool = False) -> None:
     chroot_install_extra_packages(cfg)
     chroot_create_user(cfg)
     chroot_configure_ssh(cfg)
+
+    # Detect the script path (works for both .pyz and source)
+    script_path = sys.argv[0] if sys.argv else None
+    copy_artix_dev(cfg, config_path, script_path)
 
     unmount_and_finish()
