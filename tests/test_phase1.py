@@ -58,11 +58,41 @@ def test_phase1_dry_run_skips_root_check():
     """Dry run should not require root and should not execute commands."""
     cfg = InstallConfig()
     cfg.system.ssh_authorized_keys = ["ssh-ed25519 AAAA... test@test"]
+    cfg.disk.device = "/dev/null"  # must exist for validate_system
     run_phase1(cfg, dry_run=True)
     # If we got here without error, dry run worked
     assert run_mod.DRY_RUN is True
     # Reset
     run_mod.DRY_RUN = False
+
+
+def test_phase1_dry_run_validates_disk():
+    """Dry run should fail if disk device doesn't exist."""
+    cfg = InstallConfig()
+    cfg.system.ssh_authorized_keys = ["ssh-ed25519 AAAA... test@test"]
+    cfg.disk.device = "/dev/nonexistent"
+    try:
+        run_phase1(cfg, dry_run=True)
+        assert False, "Should have exited"
+    except SystemExit:
+        pass
+    # Reset
+    run_mod.DRY_RUN = False
+
+
+def test_validate_system_disk_exists():
+    cfg = InstallConfig()
+    cfg.system.ssh_authorized_keys = ["ssh-ed25519 AAAA... test@test"]
+    cfg.disk.device = "/dev/null"
+    assert cfg.validate_system() == []
+
+
+def test_validate_system_disk_missing():
+    cfg = InstallConfig()
+    cfg.system.ssh_authorized_keys = ["ssh-ed25519 AAAA... test@test"]
+    cfg.disk.device = "/dev/nonexistent"
+    errors = cfg.validate_system()
+    assert any("does not exist" in e for e in errors)
 
 
 def test_optional_services_empty_skips():

@@ -156,6 +156,16 @@ class InstallConfig:
             )
         return errors
 
+    def validate_system(self) -> list[str]:
+        """Validate against the live system (disk exists, etc.)."""
+        import os
+        errors = self.validate()
+        if not os.path.exists(self.disk.device):
+            errors.append(
+                f"disk device {self.disk.device} does not exist"
+            )
+        return errors
+
     @property
     def kernel_package(self) -> str:
         return self.system.kernel.value

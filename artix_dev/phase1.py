@@ -364,7 +364,7 @@ def run_phase1(cfg: InstallConfig, dry_run: bool = False) -> None:
     if not dry_run and os.geteuid() != 0:
         die("Phase 1 must be run as root")
 
-    errors = cfg.validate()
+    errors = cfg.validate_system()
     if errors:
         for err in errors:
             print(f"Config error: {err}")
