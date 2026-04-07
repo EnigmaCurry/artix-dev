@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 
 from textual import on
@@ -63,8 +64,22 @@ def _list_disks() -> list[dict]:
         return []
 
 
+def _nav_buttons(*buttons: str) -> ComposeResult:
+    """Yield centered navigation buttons."""
+    with Center():
+        with Horizontal():
+            if "prev" in buttons:
+                yield Button("Previous", id="prev")
+            if "next" in buttons:
+                yield Button("Next", variant="primary", id="next")
+            if "install" in buttons:
+                yield Button("Install", variant="primary", id="install")
+            if "save" in buttons:
+                yield Button("Save Config", id="save")
+
+
 class DiskScreen(Screen):
-    BINDINGS = [Binding("escape", "back", "Back")]
+    BINDINGS = [Binding("escape", "quit", "Quit")]
 
     def __init__(self, cfg: InstallConfig) -> None:
         super().__init__()
@@ -77,12 +92,11 @@ class DiskScreen(Screen):
             yield Label("Select Target Disk", classes="title")
             yield Rule()
             if self.disks:
-                options = OptionList(
+                yield OptionList(
                     *[f"{d['device']}  {d['size']}  {d['model']}"
                       for d in self.disks],
                     id="disk-list",
                 )
-                yield options
             else:
                 yield Label("No disks detected. Enter device path manually:")
             yield Label("\nDevice path:")
@@ -95,31 +109,35 @@ class DiskScreen(Screen):
             yield Input(value=self.cfg.disk.esp_size, id="esp-size")
             yield Checkbox("Enable SSD TRIM", value=self.cfg.disk.trim, id="trim")
             yield Rule()
-            with Center():
-                with Horizontal():
-                    yield Button("Next", variant="primary", id="next")
+            yield from _nav_buttons("next")
         yield Footer()
 
     @on(OptionList.OptionSelected, "#disk-list")
     def disk_selected(self, event: OptionList.OptionSelected) -> None:
-        idx = event.option_index
-        disk = self.disks[idx]
+        disk = self.disks[event.option_index]
         self.query_one("#device", Input).value = disk["device"]
 
     @on(Button.Pressed, "#next")
     def next_screen(self) -> None:
-        self.cfg.disk.device = self.query_one("#device", Input).value
-        self.cfg.disk.esp_size = self.query_one("#esp-size", Input).value
+        device = self.query_one("#device", Input).value.strip()
+        esp = self.query_one("#esp-size", Input).value.strip()
+        if not device:
+            self.notify("Device path is required", severity="error")
+            return
+        if not device.startswith("/dev/"):
+            self.notify("Device path must start with /dev/", severity="error")
+            return
+        if not esp:
+            self.notify("ESP size is required", severity="error")
+            return
+        self.cfg.disk.device = device
+        self.cfg.disk.esp_size = esp
         self.cfg.disk.trim = self.query_one("#trim", Checkbox).value
-        # Auto-detect disk type
-        if "nvme" in self.cfg.disk.device:
-            self.cfg.disk.disk_type = DiskType.NVME
-        else:
-            self.cfg.disk.disk_type = DiskType.OTHER
+        self.cfg.disk.disk_type = DiskType.NVME if "nvme" in device else DiskType.OTHER
         self.app.push_screen(LuksScreen(self.cfg))
 
-    def action_back(self) -> None:
-        self.app.pop_screen()
+    def action_quit(self) -> None:
+        self.app.exit()
 
 
 class LuksScreen(Screen):
@@ -148,20 +166,35 @@ class LuksScreen(Screen):
             yield Label("LVM swap size:")
             yield Input(value=self.cfg.lvm.swap_size, id="swap-size")
             yield Rule()
-            with Center():
-                with Horizontal():
-                    yield Button("Next", variant="primary", id="next")
+            yield from _nav_buttons("prev", "next")
         yield Footer()
 
     @on(Button.Pressed, "#next")
     def next_screen(self) -> None:
-        self.cfg.luks.cipher = self.query_one("#cipher", Input).value
-        self.cfg.luks.key_size = int(self.query_one("#key-size", Input).value)
-        self.cfg.luks.hash = self.query_one("#hash", Input).value
-        self.cfg.luks.iter_time = int(self.query_one("#iter-time", Input).value)
-        self.cfg.lvm.boot_size = self.query_one("#boot-size", Input).value
-        self.cfg.lvm.swap_size = self.query_one("#swap-size", Input).value
+        cipher = self.query_one("#cipher", Input).value.strip()
+        key_size = self.query_one("#key-size", Input).value.strip()
+        hash_val = self.query_one("#hash", Input).value.strip()
+        iter_time = self.query_one("#iter-time", Input).value.strip()
+        boot = self.query_one("#boot-size", Input).value.strip()
+        swap = self.query_one("#swap-size", Input).value.strip()
+        if not all([cipher, key_size, hash_val, iter_time, boot, swap]):
+            self.notify("All fields are required", severity="error")
+            return
+        try:
+            self.cfg.luks.key_size = int(key_size)
+            self.cfg.luks.iter_time = int(iter_time)
+        except ValueError:
+            self.notify("Key size and iteration time must be numbers", severity="error")
+            return
+        self.cfg.luks.cipher = cipher
+        self.cfg.luks.hash = hash_val
+        self.cfg.lvm.boot_size = boot
+        self.cfg.lvm.swap_size = swap
         self.app.push_screen(SystemScreen(self.cfg))
+
+    @on(Button.Pressed, "#prev")
+    def prev_screen(self) -> None:
+        self.app.pop_screen()
 
     def action_back(self) -> None:
         self.app.pop_screen()
@@ -203,23 +236,50 @@ class SystemScreen(Screen):
                         value=(k == self.cfg.system.kernel),
                     )
             yield Rule()
-            with Center():
-                with Horizontal():
-                    yield Button("Next", variant="primary", id="next")
+            yield from _nav_buttons("prev", "next")
         yield Footer()
 
     @on(Button.Pressed, "#next")
     def next_screen(self) -> None:
-        self.cfg.system.hostname = self.query_one("#hostname", Input).value
-        self.cfg.system.username = self.query_one("#username", Input).value
-        self.cfg.system.locale = self.query_one("#locale", Input).value
-        self.cfg.system.timezone = self.query_one("#timezone", Input).value
+        hostname = self.query_one("#hostname", Input).value.strip()
+        username = self.query_one("#username", Input).value.strip()
+        locale = self.query_one("#locale", Input).value.strip()
+        timezone = self.query_one("#timezone", Input).value.strip()
+        if not hostname:
+            self.notify("Hostname is required", severity="error")
+            return
+        if not re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$', hostname):
+            self.notify("Invalid hostname (letters, digits, hyphens only)", severity="error")
+            return
+        if not username:
+            self.notify("Username is required", severity="error")
+            return
+        if username == "root":
+            self.notify("Username must not be root", severity="error")
+            return
+        if not re.match(r'^[a-z_][a-z0-9_-]*$', username):
+            self.notify("Invalid username (lowercase, start with letter/underscore)", severity="error")
+            return
+        if not locale:
+            self.notify("Locale is required", severity="error")
+            return
+        if not timezone:
+            self.notify("Timezone is required", severity="error")
+            return
+        self.cfg.system.hostname = hostname
+        self.cfg.system.username = username
+        self.cfg.system.locale = locale
+        self.cfg.system.timezone = timezone
         self.cfg.system.tmpfs_size = self.query_one("#tmpfs-size", Input).value
         self.cfg.system.caps_lock_remap = self.query_one("#capslock", Checkbox).value
         kernel_set = self.query_one("#kernel", RadioSet)
         if kernel_set.pressed_index >= 0:
             self.cfg.system.kernel = list(Kernel)[kernel_set.pressed_index]
         self.app.push_screen(SshScreen(self.cfg))
+
+    @on(Button.Pressed, "#prev")
+    def prev_screen(self) -> None:
+        self.app.pop_screen()
 
     def action_back(self) -> None:
         self.app.pop_screen()
@@ -256,9 +316,7 @@ class SshScreen(Screen):
                 id="ssh-keys",
             )
             yield Rule()
-            with Center():
-                with Horizontal():
-                    yield Button("Next", variant="primary", id="next")
+            yield from _nav_buttons("prev", "next")
         yield Footer()
 
     @on(Button.Pressed, "#next")
@@ -271,7 +329,23 @@ class SshScreen(Screen):
             line.strip() for line in keys_text.splitlines()
             if line.strip() and not line.strip().startswith("#")
         ]
+        if self.cfg.system.ssh == SshPolicy.ENABLE_KEYS_ONLY:
+            if not self.cfg.system.ssh_authorized_keys:
+                self.notify("Keys-only SSH requires at least one public key", severity="error")
+                return
+            valid_prefixes = (
+                "ssh-ed25519 ", "ssh-rsa ", "ssh-dss ",
+                "ecdsa-sha2-", "sk-ssh-ed25519@", "sk-ecdsa-sha2-",
+            )
+            for key in self.cfg.system.ssh_authorized_keys:
+                if not any(key.startswith(p) for p in valid_prefixes):
+                    self.notify(f"Invalid SSH key format: {key[:40]}...", severity="error")
+                    return
         self.app.push_screen(FeaturesScreen(self.cfg))
+
+    @on(Button.Pressed, "#prev")
+    def prev_screen(self) -> None:
+        self.app.pop_screen()
 
     def action_back(self) -> None:
         self.app.pop_screen()
@@ -313,9 +387,7 @@ class FeaturesScreen(Screen):
                     id=f"svc-{s.value}",
                 )
             yield Rule()
-            with Center():
-                with Horizontal():
-                    yield Button("Next", variant="primary", id="next")
+            yield from _nav_buttons("prev", "next")
         yield Footer()
 
     @on(Button.Pressed, "#next")
@@ -329,6 +401,10 @@ class FeaturesScreen(Screen):
             if self.query_one(f"#svc-{s.value}", Checkbox).value
         }
         self.app.push_screen(SwayHomeScreen(self.cfg))
+
+    @on(Button.Pressed, "#prev")
+    def prev_screen(self) -> None:
+        self.app.pop_screen()
 
     def action_back(self) -> None:
         self.app.pop_screen()
@@ -356,18 +432,25 @@ class SwayHomeScreen(Screen):
             yield Label("GRUB graphics mode:")
             yield Input(value=self.cfg.grub.gfxmode, id="grub-gfxmode")
             yield Rule()
-            with Center():
-                with Horizontal():
-                    yield Button("Next", variant="primary", id="next")
+            yield from _nav_buttons("prev", "next")
         yield Footer()
 
     @on(Button.Pressed, "#next")
     def next_screen(self) -> None:
+        timeout = self.query_one("#grub-timeout", Input).value.strip()
+        try:
+            self.cfg.grub.timeout = int(timeout)
+        except ValueError:
+            self.notify("GRUB timeout must be a number", severity="error")
+            return
         self.cfg.sway_home.repo = self.query_one("#repo", Input).value
         self.cfg.sway_home.clone_path = self.query_one("#clone-path", Input).value
-        self.cfg.grub.timeout = int(self.query_one("#grub-timeout", Input).value)
         self.cfg.grub.gfxmode = self.query_one("#grub-gfxmode", Input).value
         self.app.push_screen(ReviewScreen(self.cfg))
+
+    @on(Button.Pressed, "#prev")
+    def prev_screen(self) -> None:
+        self.app.pop_screen()
 
     def action_back(self) -> None:
         self.app.pop_screen()
@@ -393,10 +476,7 @@ class ReviewScreen(Screen):
                 for err in errors:
                     yield Label(f"  - {err}", classes="error")
                 yield Rule()
-            with Center():
-                with Horizontal():
-                    yield Button("Install", variant="primary", id="install")
-                    yield Button("Save Config", variant="default", id="save")
+            yield from _nav_buttons("prev", "install", "save")
         yield Footer()
 
     @on(Button.Pressed, "#install")
@@ -412,6 +492,10 @@ class ReviewScreen(Screen):
     def do_save(self) -> None:
         self.app.result = ("save", self.cfg)
         self.app.exit()
+
+    @on(Button.Pressed, "#prev")
+    def prev_screen(self) -> None:
+        self.app.pop_screen()
 
     def action_back(self) -> None:
         self.app.pop_screen()
