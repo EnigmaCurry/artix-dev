@@ -24,8 +24,8 @@ def _ensure_root() -> None:
         if result.returncode != 0:
             print("Error: sudo authentication failed", file=sys.stderr)
             sys.exit(1)
-    # Re-exec ourselves with sudo
-    os.execvp("sudo", ["sudo"] + sys.argv)
+    # Re-exec ourselves with sudo, using python -m for consistency
+    os.execvp("sudo", ["sudo", sys.executable, "-m", "artix_dev"] + sys.argv[1:])
 
 DEFAULT_CONFIG = Path("/root/artix-dev/config.toml")
 
