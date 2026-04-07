@@ -37,6 +37,7 @@ from artix_dev.config import (
 _SIZE_RE = re.compile(r'^\d+(\.\d+)?[KMGTkmgt]$')
 
 TABS = [
+    ("welcome", "Welcome"),
     ("disk", "Disk"),
     ("system", "System"),
     ("ssh", "SSH"),
@@ -141,7 +142,8 @@ class ArtixInstaller(App):
                       for key, label in TABS],
                     id="nav",
                 )
-            with ContentSwitcher(id="content", initial="disk"):
+            with ContentSwitcher(id="content", initial="welcome"):
+                yield from self._welcome_tab()
                 yield from self._disk_tab()
                 yield from self._system_tab()
                 yield from self._ssh_tab()
@@ -152,6 +154,25 @@ class ArtixInstaller(App):
         yield Footer()
 
     # --- Tab content ---
+
+    def _welcome_tab(self) -> ComposeResult:
+        with VerticalScroll(id="welcome"):
+            yield Label("Welcome to the Artix Linux Installer", classes="title")
+            yield Rule()
+            yield Static(
+                "This installer will set up Artix Linux with full disk\n"
+                "encryption (LUKS + LVM), the dinit init system, and\n"
+                "optionally a sway Wayland desktop managed by Nix\n"
+                "home-manager.\n"
+                "\n"
+                "Use the tabs on the left to configure each section.\n"
+                "You can fill them in any order.\n"
+                "\n"
+                "When you're ready, go to [bold]Review[/] to see the\n"
+                "full configuration and start the install.\n"
+                "\n"
+                "Press [bold]Ctrl+Q[/] to exit at any time.\n"
+            )
 
     def _disk_tab(self) -> ComposeResult:
         with VerticalScroll(id="disk"):
