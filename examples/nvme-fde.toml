@@ -33,7 +33,7 @@ tmpfs_size = "8G"
 ssh = "keys_only"
 ssh_authorized_keys = [
     # Paste your public key(s) here, one per line:
-    # "ssh-ed25519 AAAA... user@host",
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINeIyA5BHv4nPttFn10ailg/82PQJ5y7WQDrG8/oV42T test@artix-dev",
 ]
 
 [sway_home]
