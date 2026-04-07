@@ -9,11 +9,12 @@ from artix_dev.config import InstallConfig
 
 
 def usage() -> None:
-    print("Usage: artix-dev <command> [config.toml]")
+    print("Usage: artix-dev <command> [options] [config.toml]")
     print()
     print("Commands:")
-    print("  install [config.toml]   Run Phase 1 installation (TUI if no config given)")
-    print("  dump-config             Print default config to stdout")
+    print("  install [config.toml]       Run Phase 1 installation (TUI if no config given)")
+    print("  install --dry-run <config>  Show what would be done without executing")
+    print("  dump-config                 Print default config to stdout")
     sys.exit(1)
 
 
@@ -28,8 +29,12 @@ def main() -> None:
         print(InstallConfig().to_toml())
 
     elif command == "install":
-        if len(args) >= 2:
-            config_path = Path(args[1])
+        rest = args[1:]
+        dry_run = "--dry-run" in rest
+        rest = [a for a in rest if a != "--dry-run"]
+
+        if rest:
+            config_path = Path(rest[0])
             if not config_path.exists():
                 print(f"Error: {config_path} not found", file=sys.stderr)
                 sys.exit(1)
@@ -41,7 +46,7 @@ def main() -> None:
             sys.exit(1)
 
         from artix_dev.phase1 import run_phase1
-        run_phase1(cfg)
+        run_phase1(cfg, dry_run=dry_run)
 
     else:
         print(f"Unknown command: {command}", file=sys.stderr)

@@ -6,12 +6,15 @@ import os
 
 from artix_dev.config import InstallConfig, OptionalService, SshPolicy
 from artix_dev.run import (
+    DRY_RUN,
     append_file,
     die,
     heading,
+    makedirs,
     run,
     run_chroot,
     run_shell,
+    symlink,
     write_file,
 )
 
@@ -102,9 +105,9 @@ def mount_partitions(cfg: InstallConfig) -> None:
     heading("Mounting partitions")
     run("swapon", "/dev/lvmSystem/volSwap")
     run("mount", "/dev/lvmSystem/volRoot", "/mnt")
-    os.makedirs("/mnt/boot", exist_ok=True)
+    makedirs("/mnt/boot", exist_ok=True)
     run("mount", "/dev/lvmSystem/volBoot", "/mnt/boot")
-    os.makedirs("/mnt/boot/efi", exist_ok=True)
+    makedirs("/mnt/boot/efi", exist_ok=True)
     run("mount", cfg.disk.esp_partition, "/mnt/boot/efi")
 
 
@@ -132,10 +135,10 @@ def install_base(cfg: InstallConfig) -> None:
 def copy_wifi_config() -> None:
     heading("Copying WiFi configuration")
     src = "/etc/NetworkManager/system-connections"
-    if os.path.isdir(src) and os.listdir(src):
-        run("cp", "-r", src, "/mnt/etc/NetworkManager/")
-    else:
+    if not DRY_RUN and (not os.path.isdir(src) or not os.listdir(src)):
         print("  No WiFi connections found, skipping.")
+        return
+    run("cp", "-r", src, "/mnt/etc/NetworkManager/")
 
 
 def generate_fstab(cfg: InstallConfig) -> None:
@@ -198,7 +201,7 @@ def chroot_configure_capslock(cfg: InstallConfig) -> None:
     )
     write_file("/mnt/etc/vconsole.conf", "KEYMAP=personal\n")
     # X11
-    os.makedirs("/mnt/etc/X11/xorg.conf.d", exist_ok=True)
+    makedirs("/mnt/etc/X11/xorg.conf.d", exist_ok=True)
     write_file(
         "/mnt/etc/X11/xorg.conf.d/00-keyboard.conf",
         'Section "InputClass"\n'
@@ -278,7 +281,7 @@ def chroot_enable_services(cfg: InstallConfig) -> None:
         base_services.append("sshd")
 
     for svc in base_services:
-        os.symlink(f"/etc/dinit.d/{svc}", f"/mnt/etc/dinit.d/boot.d/{svc}")
+        symlink(f"/etc/dinit.d/{svc}", f"/mnt/etc/dinit.d/boot.d/{svc}")
 
 
 def chroot_install_optional_services(cfg: InstallConfig) -> None:
@@ -294,7 +297,7 @@ def chroot_install_optional_services(cfg: InstallConfig) -> None:
 
     for svc in cfg.optional_services:
         name = OPTIONAL_SERVICE_NAMES[svc]
-        os.symlink(f"/etc/dinit.d/{name}", f"/mnt/etc/dinit.d/boot.d/{name}")
+        symlink(f"/etc/dinit.d/{name}", f"/mnt/etc/dinit.d/boot.d/{name}")
 
 
 def chroot_install_extra_packages(cfg: InstallConfig) -> None:
@@ -327,7 +330,7 @@ def chroot_configure_ssh(cfg: InstallConfig) -> None:
 
     # Install authorized keys
     ssh_dir = f"{home}/.ssh"
-    os.makedirs(ssh_dir, mode=0o700, exist_ok=True)
+    makedirs(ssh_dir, mode=0o700, exist_ok=True)
     authorized_keys = "\n".join(cfg.system.ssh_authorized_keys) + "\n"
     write_file(f"{ssh_dir}/authorized_keys", authorized_keys, mode=0o600)
 
@@ -353,9 +356,12 @@ def unmount_and_finish() -> None:
     print("\nInstallation complete. You may now reboot.")
 
 
-def run_phase1(cfg: InstallConfig) -> None:
+def run_phase1(cfg: InstallConfig, dry_run: bool = False) -> None:
     """Execute the full Phase 1 installation from the live USB."""
-    if os.geteuid() != 0:
+    import artix_dev.run as run_mod
+    run_mod.DRY_RUN = dry_run
+
+    if not dry_run and os.geteuid() != 0:
         die("Phase 1 must be run as root")
 
     errors = cfg.validate()
