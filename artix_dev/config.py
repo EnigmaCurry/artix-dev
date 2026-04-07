@@ -157,13 +157,31 @@ class InstallConfig:
         return errors
 
     def validate_system(self) -> list[str]:
-        """Validate against the live system (disk exists, etc.)."""
+        """Validate against the live system (disk exists, mounted, etc.)."""
         import os
+        import subprocess
         errors = self.validate()
-        if not os.path.exists(self.disk.device):
-            errors.append(
-                f"disk device {self.disk.device} does not exist"
-            )
+        device = self.disk.device
+        if not os.path.exists(device):
+            errors.append(f"disk device {device} does not exist")
+        elif os.path.exists(device):
+            # Check if any partition on this disk is mounted
+            try:
+                result = subprocess.run(
+                    ["lsblk", "-no", "MOUNTPOINT", device],
+                    capture_output=True, text=True,
+                )
+                mountpoints = [
+                    line.strip() for line in result.stdout.splitlines()
+                    if line.strip()
+                ]
+                if mountpoints:
+                    errors.append(
+                        f"disk {device} is in use "
+                        f"(mounted: {', '.join(mountpoints)})"
+                    )
+            except FileNotFoundError:
+                pass  # lsblk not available, skip check
         return errors
 
     @property
