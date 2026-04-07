@@ -11,6 +11,8 @@ build:
     rm -rf build
     mkdir -p build/app
     cp -r artix_dev build/app/
+    # Stamp version with git SHA
+    echo "VERSION = \"$(git rev-parse --short HEAD)\"" > build/app/artix_dev/_version.py
     # Install runtime deps (if any) into the bundle
     uv export --no-dev --no-emit-project -o build/requirements.txt 2>/dev/null && \
         uv pip install --target build/app -r build/requirements.txt 2>/dev/null || true

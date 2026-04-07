@@ -25,7 +25,11 @@ def main() -> None:
 
     command = args[0]
 
-    if command == "dump-config":
+    if command == "--version":
+        from artix_dev._version import VERSION
+        print(VERSION)
+
+    elif command == "dump-config":
         print(InstallConfig().to_toml())
 
     elif command == "install":
