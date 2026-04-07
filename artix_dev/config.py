@@ -73,18 +73,28 @@ class LuksConfig:
     luks_type: str = "luks1"  # luks1 required for GRUB encrypted /boot
 
 
-def _detect_ram_size() -> str:
-    """Detect system RAM and return as a size string (e.g. '16G')."""
+def _detect_ram_gb() -> int:
+    """Detect system RAM in GB, or 16 as fallback."""
     try:
         with open("/proc/meminfo") as f:
             for line in f:
                 if line.startswith("MemTotal:"):
                     kb = int(line.split()[1])
-                    gb = round(kb / 1024 / 1024)
-                    return f"{max(gb, 1)}G"
+                    return max(round(kb / 1024 / 1024), 1)
     except OSError:
         pass
-    return "16G"
+    return 16
+
+
+def _detect_tmpfs_size() -> str:
+    """Half of RAM, capped at 8GB."""
+    ram_gb = _detect_ram_gb()
+    return f"{min(ram_gb // 2, 8) or 1}G"
+
+
+def _detect_ram_size() -> str:
+    """Detect system RAM and return as a size string (e.g. '16G')."""
+    return f"{_detect_ram_gb()}G"
 
 
 @dataclass
@@ -116,9 +126,13 @@ class SystemConfig:
     username: str = "user"
     kernel: Kernel = Kernel.HARDENED
     caps_lock_remap: bool = True
-    tmpfs_size: str = "8G"
+    tmpfs_size: str = ""
     ssh: SshPolicy = SshPolicy.ENABLE_KEYS_ONLY
     ssh_authorized_keys: list[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if not self.tmpfs_size:
+            self.tmpfs_size = _detect_tmpfs_size()
 
 
 @dataclass
