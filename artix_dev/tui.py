@@ -153,6 +153,14 @@ class ArtixInstaller(App):
                 yield from self._review_tab()
         yield Footer()
 
+    def _tab_nav(self) -> ComposeResult:
+        """Save and Next buttons for each tab."""
+        yield Rule()
+        with Center():
+            with Horizontal():
+                yield Button("Save", id="save")
+                yield Button("Next", variant="primary", id="next")
+
     # --- Tab content ---
 
     def _welcome_tab(self) -> ComposeResult:
@@ -177,6 +185,7 @@ class ArtixInstaller(App):
                 "\n"
                 "[bold]Ctrl+Q[/] to exit at any time.\n"
             )
+            yield from self._tab_nav()
 
     def _disk_tab(self) -> ComposeResult:
         with VerticalScroll(id="disk"):
@@ -219,6 +228,7 @@ class ArtixInstaller(App):
                 disabled=not has_swap,
                 id="swap-size",
             )
+            yield from self._tab_nav()
 
     def _advanced_tab(self) -> ComposeResult:
         with VerticalScroll(id="advanced"):
@@ -248,6 +258,7 @@ class ArtixInstaller(App):
                 placeholder="e.g. 10000",
                 id="iter-time",
             )
+            yield from self._tab_nav()
 
     def _system_tab(self) -> ComposeResult:
         with VerticalScroll(id="system"):
@@ -296,6 +307,7 @@ class ArtixInstaller(App):
                         k.value,
                         value=(k == self.cfg.system.kernel),
                     )
+            yield from self._tab_nav()
 
     def _ssh_tab(self) -> ComposeResult:
         with VerticalScroll(id="ssh"):
@@ -323,6 +335,7 @@ class ArtixInstaller(App):
                     placeholder="ssh-ed25519 AAAA... user@host",
                     id=f"ssh-key-{i}",
                 )
+            yield from self._tab_nav()
 
     def _features_tab(self) -> ComposeResult:
         with VerticalScroll(id="features"):
@@ -351,6 +364,7 @@ class ArtixInstaller(App):
                     value=(s in self.cfg.optional_services),
                     id=f"svc-{s.value}",
                 )
+            yield from self._tab_nav()
 
     def _extras_tab(self) -> ComposeResult:
         with VerticalScroll(id="extras"):
@@ -381,6 +395,7 @@ class ArtixInstaller(App):
                 placeholder="e.g. auto, 1920x1080",
                 id="grub-gfxmode",
             )
+            yield from self._tab_nav()
 
     def _review_tab(self) -> ComposeResult:
         with VerticalScroll(id="review"):
@@ -604,6 +619,23 @@ class ArtixInstaller(App):
         self.query_one("#validation-errors", Static).update(text)
 
     # --- Actions ---
+
+    @on(Button.Pressed, "#next")
+    def do_next(self) -> None:
+        switcher = self.query_one("#content", ContentSwitcher)
+        current = switcher.current
+        tab_keys = [k for k, _ in TABS]
+        try:
+            idx = tab_keys.index(current)
+        except ValueError:
+            return
+        if idx < len(tab_keys) - 1:
+            next_key = tab_keys[idx + 1]
+            switcher.current = next_key
+            nav = self.query_one("#nav", ListView)
+            nav.index = idx + 1
+            if next_key == "review":
+                self._update_review()
 
     @on(Button.Pressed, "#install")
     def do_install(self) -> None:
