@@ -155,6 +155,10 @@ def setup_nix(cfg: InstallConfig) -> None:
     if _path_exists(f"{home}/.nix-profile/bin/nix"):
         print("  Nix already installed.")
     else:
+        # Create /nix owned by user (nix single-user install expects this)
+        if not _path_exists("/nix"):
+            makedirs("/nix", mode=0o755, exist_ok=True)
+            run("chown", username, "/nix")
         run_as_user(username,
                     "curl", "-L", "https://nixos.org/nix/install",
                     "|", "sh", "-s", "--", "--no-daemon")
