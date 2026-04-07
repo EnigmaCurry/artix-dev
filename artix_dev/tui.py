@@ -171,9 +171,10 @@ class ArtixInstaller(App):
                 "You can fill them in any order.\n"
                 "\n"
                 "When you're ready, go to [bold]Review[/] to see the\n"
-                "full configuration and start the install.\n"
+                "full configuration, then [bold]Install[/] to begin or\n"
+                "[bold]Save Config[/] to save for later.\n"
                 "\n"
-                "Press [bold]Ctrl+Q[/] to exit at any time.\n"
+                "[bold]Ctrl+Q[/] to exit at any time.\n"
             )
 
     def _disk_tab(self) -> ComposeResult:
