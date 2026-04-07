@@ -105,14 +105,10 @@ class DiskScreen(Screen):
                       for d in self.disks],
                     id="disk-list",
                 )
+                yield Label("")
             else:
-                yield Label("No disks detected. Enter device path manually:")
-            yield Label("\nDevice path:")
-            yield Input(
-                value="",
-                placeholder="/dev/nvme0n1, /dev/vda, /dev/sda, ...",
-                id="device",
-            )
+                yield Label("No disks detected.")
+                yield Label("")
             yield Label("ESP size:")
             yield Input(
                 value=self.cfg.disk.esp_size,
@@ -126,29 +122,29 @@ class DiskScreen(Screen):
 
     @on(OptionList.OptionSelected, "#disk-list")
     def disk_selected(self, event: OptionList.OptionSelected) -> None:
-        disk = self.disks[event.option_index]
-        self.query_one("#device", Input).value = disk["device"]
+        self.selected_disk = event.option_index
 
     @on(Button.Pressed, "#next")
     def next_screen(self) -> None:
-        device = self.query_one("#device", Input).value.strip()
+        if not self.disks:
+            self.notify("No disks available", severity="error")
+            return
+        idx = getattr(self, "selected_disk", None)
+        if idx is None:
+            self.notify("Select a disk from the list", severity="error")
+            return
         esp = self.query_one("#esp-size", Input).value.strip()
-        if not device:
-            self.notify("Device path is required", severity="error")
-            return
-        if not device.startswith("/dev/"):
-            self.notify("Device path must start with /dev/", severity="error")
-            return
         if not esp:
             self.notify("ESP size is required", severity="error")
             return
         if not _valid_size(esp):
             self.notify("ESP size must be a valid size (e.g. 1G, 512M)", severity="error")
             return
-        self.cfg.disk.device = device
+        disk = self.disks[idx]
+        self.cfg.disk.device = disk["device"]
+        self.cfg.disk.disk_type = disk["type"]
         self.cfg.disk.esp_size = esp
         self.cfg.disk.trim = self.query_one("#trim", Checkbox).value
-        self.cfg.disk.disk_type = DiskType.NVME if "nvme" in device else DiskType.OTHER
         self.app.push_screen(LuksScreen(self.cfg))
 
     def action_quit(self) -> None:
