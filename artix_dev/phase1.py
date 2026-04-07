@@ -422,9 +422,16 @@ def run_phase1(cfg: InstallConfig, dry_run: bool = False,
     print()
 
     if not dry_run:
-        answer = input("  Type YES to proceed: ")
-        if answer != "YES":
-            die("Aborted by user")
+        while True:
+            try:
+                answer = input("  Type YES to proceed (or no to cancel): ").strip()
+            except (KeyboardInterrupt, EOFError):
+                print()
+                die("Aborted by user")
+            if answer == "YES":
+                break
+            if answer.lower() in ("n", "no", "quit", "exit", "abort"):
+                die("Aborted by user")
 
     install_live_deps()
     partition_disk(cfg)
