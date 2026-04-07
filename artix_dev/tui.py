@@ -160,10 +160,12 @@ class ArtixInstaller(App):
             yield Label("Welcome to the Artix Linux Installer", classes="title")
             yield Rule()
             yield Static(
-                "This installer will set up Artix Linux with full disk\n"
-                "encryption (LUKS + LVM), the dinit init system, and\n"
-                "optionally a sway Wayland desktop managed by Nix\n"
-                "home-manager.\n"
+                "[italic]This is an unofficial community installer, not\n"
+                "affiliated with the Artix Linux project.[/]\n"
+                "\n"
+                "artix-dev sets up Artix Linux with full disk encryption\n"
+                "(LUKS + LVM), the dinit init system, and optionally a\n"
+                "sway Wayland desktop managed by Nix home-manager.\n"
                 "\n"
                 "Use the tabs on the left to configure each section.\n"
                 "You can fill them in any order.\n"
