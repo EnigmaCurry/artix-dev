@@ -10,6 +10,7 @@ from textual import on
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Center, Horizontal, Vertical, VerticalScroll
+from textual.screen import ModalScreen
 from textual.widgets import (
     Button,
     Checkbox,
@@ -77,6 +78,38 @@ def _list_disks() -> list[dict]:
         return disks
     except FileNotFoundError:
         return []
+
+
+class ConfirmDelete(ModalScreen[bool]):
+    CSS = """
+    ConfirmDelete {
+        align: center middle;
+    }
+    #confirm-dialog {
+        width: 50;
+        height: auto;
+        padding: 1 2;
+        background: $surface;
+        border: thick $error;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="confirm-dialog"):
+            yield Label("Delete saved config and reset all fields?")
+            yield Label("")
+            with Center():
+                with Horizontal():
+                    yield Button("Delete", variant="error", id="confirm-yes")
+                    yield Button("Cancel", id="confirm-no")
+
+    @on(Button.Pressed, "#confirm-yes")
+    def confirm(self) -> None:
+        self.dismiss(True)
+
+    @on(Button.Pressed, "#confirm-no")
+    def cancel(self) -> None:
+        self.dismiss(False)
 
 
 class ArtixInstaller(App):
@@ -652,10 +685,13 @@ class ArtixInstaller(App):
 
     @on(Button.Pressed, "#delete-config")
     def do_delete_config(self) -> None:
-        if self.config_path and os.path.exists(self.config_path):
-            os.remove(self.config_path)
-        self.result = ("reset", InstallConfig())
-        self.exit()
+        def on_confirm(confirmed: bool) -> None:
+            if confirmed:
+                if self.config_path and os.path.exists(self.config_path):
+                    os.remove(self.config_path)
+                self.result = ("reset", InstallConfig())
+                self.exit()
+        self.push_screen(ConfirmDelete(), on_confirm)
 
     @on(Button.Pressed, "#install")
     def do_install(self) -> None:
