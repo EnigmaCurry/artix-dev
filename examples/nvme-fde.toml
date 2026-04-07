@@ -4,6 +4,8 @@
 [disk]
 device = "/dev/nvme0n1"
 type = "nvme"
+esp_size = "1G"
+trim = true
 
 [luks]
 cipher = "serpent-xts-plain64"
@@ -16,6 +18,10 @@ luks_type = "luks1"
 boot_size = "1G"
 swap_size = "16G"
 
+[grub]
+timeout = 15
+gfxmode = "auto"
+
 [system]
 hostname = "artix"
 locale = "en_US.UTF-8"
@@ -24,6 +30,7 @@ username = "user"
 kernel = "linux-hardened"
 caps_lock_remap = true
 tmpfs_size = "8G"
+ssh = "keys_only"
 
 [sway_home]
 repo = "https://github.com/EnigmaCurry/sway-home"
@@ -34,3 +41,14 @@ enable = ["desktop", "flatpak", "nix", "podman", "sway_home"]
 
 [services]
 enable = ["acpid", "cronie", "ntpd", "syslog-ng"]
+
+[packages]
+extra = [
+    "bash-completion", "lsof", "strace", "wget", "htop",
+    "zip", "unzip", "p7zip", "unrar",
+    "hdparm", "smartmontools", "hwinfo", "dmidecode",
+    "rsync", "nmap", "inetutils", "net-tools", "whois",
+]
+
+[flatpak]
+apps = ["org.fedoraproject.MediaWriter"]

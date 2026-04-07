@@ -36,10 +36,18 @@ class Kernel(Enum):
     ZEN = "linux-zen"
 
 
+class SshPolicy(Enum):
+    ENABLE_KEYS_ONLY = "keys_only"  # sshd enabled, password auth disabled
+    ENABLE_PASSWORD = "password"  # sshd enabled, password auth allowed
+    DISABLE = "disable"  # sshd not running
+
+
 @dataclass
 class DiskConfig:
     device: str = "/dev/nvme0n1"
     disk_type: DiskType = DiskType.NVME
+    esp_size: str = "1G"
+    trim: bool = True  # add discard to fstab mount options
 
     @property
     def part_prefix(self) -> str:
@@ -73,6 +81,12 @@ class LvmConfig:
 
 
 @dataclass
+class GrubConfig:
+    timeout: int = 15
+    gfxmode: str = "auto"
+
+
+@dataclass
 class SystemConfig:
     hostname: str = "artix"
     locale: str = "en_US.UTF-8"
@@ -81,6 +95,7 @@ class SystemConfig:
     kernel: Kernel = Kernel.HARDENED
     caps_lock_remap: bool = True
     tmpfs_size: str = "8G"
+    ssh: SshPolicy = SshPolicy.ENABLE_KEYS_ONLY
 
 
 @dataclass
@@ -89,11 +104,25 @@ class SwayHomeConfig:
     clone_path: str = "~/git/vendor/enigmacurry/sway-home"
 
 
+# Default packages installed beyond base system
+DEFAULT_EXTRA_PACKAGES: list[str] = [
+    "bash-completion", "lsof", "strace", "wget", "htop",
+    "zip", "unzip", "p7zip", "unrar",
+    "hdparm", "smartmontools", "hwinfo", "dmidecode",
+    "rsync", "nmap", "inetutils", "net-tools", "whois",
+]
+
+DEFAULT_FLATPAK_APPS: list[str] = [
+    "org.fedoraproject.MediaWriter",
+]
+
+
 @dataclass
 class InstallConfig:
     disk: DiskConfig = field(default_factory=DiskConfig)
     luks: LuksConfig = field(default_factory=LuksConfig)
     lvm: LvmConfig = field(default_factory=LvmConfig)
+    grub: GrubConfig = field(default_factory=GrubConfig)
     system: SystemConfig = field(default_factory=SystemConfig)
     sway_home: SwayHomeConfig = field(default_factory=SwayHomeConfig)
     features: set[Feature] = field(default_factory=lambda: {
@@ -109,6 +138,12 @@ class InstallConfig:
         OptionalService.ACPID,
         OptionalService.CRONIE,
     })
+    extra_packages: list[str] = field(
+        default_factory=lambda: list(DEFAULT_EXTRA_PACKAGES)
+    )
+    flatpak_apps: list[str] = field(
+        default_factory=lambda: list(DEFAULT_FLATPAK_APPS)
+    )
 
     @property
     def kernel_package(self) -> str:
@@ -148,6 +183,8 @@ class InstallConfig:
         lines.append("[disk]")
         lines.append(f'device = "{self.disk.device}"')
         lines.append(f'type = "{self.disk.disk_type.value}"')
+        lines.append(f'esp_size = "{self.disk.esp_size}"')
+        lines.append(f"trim = {str(self.disk.trim).lower()}")
 
         lines.append("\n[luks]")
         lines.append(f'cipher = "{self.luks.cipher}"')
@@ -160,6 +197,10 @@ class InstallConfig:
         lines.append(f'boot_size = "{self.lvm.boot_size}"')
         lines.append(f'swap_size = "{self.lvm.swap_size}"')
 
+        lines.append("\n[grub]")
+        lines.append(f"timeout = {self.grub.timeout}")
+        lines.append(f'gfxmode = "{self.grub.gfxmode}"')
+
         lines.append("\n[system]")
         lines.append(f'hostname = "{self.system.hostname}"')
         lines.append(f'locale = "{self.system.locale}"')
@@ -168,6 +209,7 @@ class InstallConfig:
         lines.append(f'kernel = "{self.system.kernel.value}"')
         lines.append(f"caps_lock_remap = {str(self.system.caps_lock_remap).lower()}")
         lines.append(f'tmpfs_size = "{self.system.tmpfs_size}"')
+        lines.append(f'ssh = "{self.system.ssh.value}"')
 
         lines.append("\n[sway_home]")
         lines.append(f'repo = "{self.sway_home.repo}"')
@@ -179,15 +221,24 @@ class InstallConfig:
         lines.append("\n[services]")
         lines.append(f"enable = [{', '.join(f'\"{s.value}\"' for s in sorted(self.optional_services, key=lambda s: s.value))}]")
 
+        lines.append("\n[packages]")
+        lines.append(f"extra = [{', '.join(f'\"{p}\"' for p in self.extra_packages)}]")
+
+        lines.append("\n[flatpak]")
+        lines.append(f"apps = [{', '.join(f'\"{a}\"' for a in self.flatpak_apps)}]")
+
         return "\n".join(lines) + "\n"
 
     @classmethod
     def from_toml(cls, text: str) -> InstallConfig:
         data = tomllib.loads(text)
 
+        disk_data = data.get("disk", {})
         disk = DiskConfig(
-            device=data.get("disk", {}).get("device", DiskConfig.device),
-            disk_type=DiskType(data.get("disk", {}).get("type", DiskType.NVME.value)),
+            device=disk_data.get("device", DiskConfig.device),
+            disk_type=DiskType(disk_data.get("type", DiskType.NVME.value)),
+            esp_size=disk_data.get("esp_size", DiskConfig.esp_size),
+            trim=disk_data.get("trim", DiskConfig.trim),
         )
 
         luks_data = data.get("luks", {})
@@ -205,6 +256,12 @@ class InstallConfig:
             swap_size=lvm_data.get("swap_size", LvmConfig.swap_size),
         )
 
+        grub_data = data.get("grub", {})
+        grub = GrubConfig(
+            timeout=grub_data.get("timeout", GrubConfig.timeout),
+            gfxmode=grub_data.get("gfxmode", GrubConfig.gfxmode),
+        )
+
         sys_data = data.get("system", {})
         system = SystemConfig(
             hostname=sys_data.get("hostname", SystemConfig.hostname),
@@ -214,6 +271,7 @@ class InstallConfig:
             kernel=Kernel(sys_data.get("kernel", Kernel.HARDENED.value)),
             caps_lock_remap=sys_data.get("caps_lock_remap", SystemConfig.caps_lock_remap),
             tmpfs_size=sys_data.get("tmpfs_size", SystemConfig.tmpfs_size),
+            ssh=SshPolicy(sys_data.get("ssh", SshPolicy.ENABLE_KEYS_ONLY.value)),
         )
 
         sh_data = data.get("sway_home", {})
@@ -228,20 +286,28 @@ class InstallConfig:
         if "enable" in feat_data:
             features = {Feature(f) for f in feat_data["enable"]}
         else:
-            features = None  # use dataclass default
+            features = None
 
         if "enable" in svc_data:
             services = {OptionalService(s) for s in svc_data["enable"]}
         else:
-            services = None  # use dataclass default
+            services = None
+
+        pkg_data = data.get("packages", {})
+        flatpak_data = data.get("flatpak", {})
 
         kwargs: dict = dict(
-            disk=disk, luks=luks, lvm=lvm, system=system, sway_home=sway_home,
+            disk=disk, luks=luks, lvm=lvm, grub=grub,
+            system=system, sway_home=sway_home,
         )
         if features is not None:
             kwargs["features"] = features
         if services is not None:
             kwargs["optional_services"] = services
+        if "extra" in pkg_data:
+            kwargs["extra_packages"] = pkg_data["extra"]
+        if "apps" in flatpak_data:
+            kwargs["flatpak_apps"] = flatpak_data["apps"]
 
         return cls(**kwargs)
 
