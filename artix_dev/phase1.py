@@ -132,7 +132,7 @@ def install_base(cfg: InstallConfig) -> None:
         "networkmanager", "networkmanager-dinit")
     run("basestrap", "/mnt",
         "openssh", "openssh-dinit")
-    run("basestrap", "/mnt", "nano", "vi", "less")
+    run("basestrap", "/mnt", "python", "nano", "vi", "less")
 
 
 def copy_wifi_config() -> None:
