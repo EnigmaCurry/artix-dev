@@ -323,6 +323,13 @@ def chroot_create_user(cfg: InstallConfig) -> None:
         "/mnt/etc/sudoers"
     )
 
+    # Allow wheel group to reboot/poweroff without password
+    write_file(
+        "/mnt/etc/sudoers.d/power",
+        "%wheel ALL=(ALL) NOPASSWD: /sbin/reboot, /sbin/poweroff, /sbin/shutdown\n",
+        mode=0o440,
+    )
+
 
 def chroot_configure_ssh(cfg: InstallConfig) -> None:
     if cfg.system.ssh == SshPolicy.DISABLE:
