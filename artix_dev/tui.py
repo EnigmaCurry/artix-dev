@@ -419,6 +419,13 @@ class ReviewScreen(Screen):
 
 class ArtixInstaller(App):
     CSS = """
+    Screen {
+        align: center top;
+    }
+    VerticalScroll {
+        max-width: 80;
+        width: 100%;
+    }
     .title {
         text-style: bold;
         color: $accent;
