@@ -68,7 +68,21 @@ def main() -> None:
         dry_run = "--dry-run" in rest
         rest = [a for a in rest if a != "--dry-run"]
 
-        cfg, config_file = _load_config(rest)
+        if rest:
+            cfg, config_file = _load_config(rest)
+        else:
+            from artix_dev.tui import run_tui
+            result = run_tui()
+            if result is None:
+                print("Aborted.")
+                sys.exit(1)
+            action, cfg = result
+            if action == "save":
+                save_path = Path("artix-dev.toml")
+                cfg.save(save_path)
+                print(f"Config saved to {save_path}")
+                sys.exit(0)
+            config_file = None
 
         from artix_dev.phase1 import run_phase1
         run_phase1(cfg, dry_run=dry_run, config_path=config_file)
