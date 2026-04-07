@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import re
 import subprocess
 
@@ -10,45 +9,51 @@ from textual import on
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Center, Horizontal, Vertical, VerticalScroll
-from textual.screen import Screen
 from textual.widgets import (
     Button,
     Checkbox,
+    ContentSwitcher,
     Footer,
     Header,
     Input,
     Label,
-    OptionList,
-    Pretty,
+    ListItem,
+    ListView,
     RadioButton,
     RadioSet,
     Rule,
     Static,
-    TextArea,
 )
 
 from artix_dev.config import (
-    DEFAULT_EXTRA_PACKAGES,
-    DEFAULT_FLATPAK_APPS,
     DiskType,
     Feature,
     InstallConfig,
     Kernel,
     OptionalService,
     SshPolicy,
-    _parse_size,
 )
 
 _SIZE_RE = re.compile(r'^\d+(\.\d+)?[KMGTkmgt]$')
 
+TABS = [
+    ("disk", "Disk"),
+    ("encryption", "Encryption"),
+    ("system", "System"),
+    ("ssh", "SSH"),
+    ("features", "Features"),
+    ("extras", "Extras"),
+    ("review", "Review"),
+]
+
+_NUM_KEY_SLOTS = 5
+
 
 def _valid_size(value: str) -> bool:
-    """Check if a string is a valid size like '1G', '512M'."""
     return bool(_SIZE_RE.match(value.strip()))
 
 
 def _list_disks() -> list[dict]:
-    """List available block devices."""
     try:
         result = subprocess.run(
             ["lsblk", "-dno", "NAME,SIZE,MODEL,TYPE"],
@@ -72,38 +77,90 @@ def _list_disks() -> list[dict]:
         return []
 
 
-def _nav_buttons(*buttons: str) -> ComposeResult:
-    """Yield centered navigation buttons."""
-    with Center():
-        with Horizontal():
-            if "prev" in buttons:
-                yield Button("Previous", id="prev")
-            if "next" in buttons:
-                yield Button("Next", variant="primary", id="next")
-            if "install" in buttons:
-                yield Button("Install", variant="primary", id="install")
-            if "save" in buttons:
-                yield Button("Save Config", id="save")
+class ArtixInstaller(App):
+    CSS = """
+    #layout {
+        height: 1fr;
+    }
+    #sidebar {
+        width: 18;
+        dock: left;
+        background: $surface;
+    }
+    #sidebar ListView {
+        height: auto;
+    }
+    #content {
+        width: 1fr;
+    }
+    #content > VerticalScroll {
+        max-width: 72;
+        padding: 0 2;
+    }
+    .title {
+        text-style: bold;
+        color: $accent;
+        margin: 1 0;
+    }
+    .error-title {
+        text-style: bold;
+        color: $error;
+    }
+    .error {
+        color: $error;
+    }
+    Button {
+        margin: 1 1;
+    }
+    Input {
+        margin: 0 0 1 0;
+    }
+    Checkbox, RadioButton {
+        margin: 0 0 0 2;
+    }
+    #toml-preview {
+        margin: 1 0;
+        padding: 1 2;
+        background: $surface;
+    }
+    """
+    TITLE = "artix-dev installer"
 
-
-class DiskScreen(Screen):
-    BINDINGS = [Binding("escape", "quit", "Quit")]
-
-    def __init__(self, cfg: InstallConfig) -> None:
+    def __init__(self, cfg: InstallConfig | None = None) -> None:
         super().__init__()
-        self.cfg = cfg
+        self.cfg = cfg or InstallConfig()
+        self.result: tuple[str, InstallConfig] | None = None
         self.disks = _list_disks()
 
     def compose(self) -> ComposeResult:
         yield Header()
-        with VerticalScroll():
+        with Horizontal(id="layout"):
+            with Vertical(id="sidebar"):
+                yield ListView(
+                    *[ListItem(Label(label), id=f"tab-{key}")
+                      for key, label in TABS],
+                    id="nav",
+                )
+            with ContentSwitcher(id="content", initial="disk"):
+                yield from self._disk_tab()
+                yield from self._encryption_tab()
+                yield from self._system_tab()
+                yield from self._ssh_tab()
+                yield from self._features_tab()
+                yield from self._extras_tab()
+                yield from self._review_tab()
+        yield Footer()
+
+    # --- Tab content ---
+
+    def _disk_tab(self) -> ComposeResult:
+        with VerticalScroll(id="disk"):
             yield Label("Select Target Disk", classes="title")
             yield Rule()
             if self.disks:
-                # Pre-select disk from config, or first disk
-                saved_device = self.cfg.disk.device
+                saved = self.cfg.disk.device
                 match = next(
-                    (i for i, d in enumerate(self.disks) if d["device"] == saved_device),
+                    (i for i, d in enumerate(self.disks) if d["device"] == saved),
                     0,
                 )
                 with RadioSet(id="disk-list"):
@@ -121,48 +178,9 @@ class DiskScreen(Screen):
                 id="esp-size",
             )
             yield Checkbox("Enable SSD TRIM", value=self.cfg.disk.trim, id="trim")
-            yield Rule()
-            yield from _nav_buttons("next")
-        yield Footer()
 
-    @on(Button.Pressed, "#next")
-    def next_screen(self) -> None:
-        if not self.disks:
-            self.notify("No disks available", severity="error")
-            return
-        disk_set = self.query_one("#disk-list", RadioSet)
-        idx = disk_set.pressed_index
-        if idx < 0:
-            self.notify("Select a disk from the list", severity="error")
-            return
-        esp = self.query_one("#esp-size", Input).value.strip()
-        if not esp:
-            self.notify("ESP size is required", severity="error")
-            return
-        if not _valid_size(esp):
-            self.notify("ESP size must be a valid size (e.g. 1G, 512M)", severity="error")
-            return
-        disk = self.disks[idx]
-        self.cfg.disk.device = disk["device"]
-        self.cfg.disk.disk_type = disk["type"]
-        self.cfg.disk.esp_size = esp
-        self.cfg.disk.trim = self.query_one("#trim", Checkbox).value
-        self.app.push_screen(LuksScreen(self.cfg))
-
-    def action_quit(self) -> None:
-        self.app.exit()
-
-
-class LuksScreen(Screen):
-    BINDINGS = [Binding("escape", "back", "Back")]
-
-    def __init__(self, cfg: InstallConfig) -> None:
-        super().__init__()
-        self.cfg = cfg
-
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with VerticalScroll():
+    def _encryption_tab(self) -> ComposeResult:
+        with VerticalScroll(id="encryption"):
             yield Label("Encryption Settings", classes="title")
             yield Rule()
             yield Label("LUKS cipher:")
@@ -202,66 +220,9 @@ class LuksScreen(Screen):
                 placeholder="e.g. 16G (match RAM for hibernate)",
                 id="swap-size",
             )
-            yield Rule()
-            yield from _nav_buttons("prev", "next")
-        yield Footer()
 
-    @on(Button.Pressed, "#next")
-    def next_screen(self) -> None:
-        cipher = self.query_one("#cipher", Input).value.strip()
-        key_size = self.query_one("#key-size", Input).value.strip()
-        hash_val = self.query_one("#hash", Input).value.strip()
-        iter_time = self.query_one("#iter-time", Input).value.strip()
-        boot = self.query_one("#boot-size", Input).value.strip()
-        swap = self.query_one("#swap-size", Input).value.strip()
-        if not cipher:
-            self.notify("LUKS cipher is required", severity="error")
-            return
-        if not hash_val:
-            self.notify("Hash is required", severity="error")
-            return
-        try:
-            int(key_size)
-        except ValueError:
-            self.notify("Key size must be a number (bits)", severity="error")
-            return
-        try:
-            int(iter_time)
-        except ValueError:
-            self.notify("Iteration time must be a number (ms)", severity="error")
-            return
-        if not _valid_size(boot):
-            self.notify("Boot size must be a valid size (e.g. 1G)", severity="error")
-            return
-        if not _valid_size(swap):
-            self.notify("Swap size must be a valid size (e.g. 16G)", severity="error")
-            return
-        self.cfg.luks.cipher = cipher
-        self.cfg.luks.key_size = int(key_size)
-        self.cfg.luks.hash = hash_val
-        self.cfg.luks.iter_time = int(iter_time)
-        self.cfg.lvm.boot_size = boot
-        self.cfg.lvm.swap_size = swap
-        self.app.push_screen(SystemScreen(self.cfg))
-
-    @on(Button.Pressed, "#prev")
-    def prev_screen(self) -> None:
-        self.app.pop_screen()
-
-    def action_back(self) -> None:
-        self.app.pop_screen()
-
-
-class SystemScreen(Screen):
-    BINDINGS = [Binding("escape", "back", "Back")]
-
-    def __init__(self, cfg: InstallConfig) -> None:
-        super().__init__()
-        self.cfg = cfg
-
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with VerticalScroll():
+    def _system_tab(self) -> ComposeResult:
+        with VerticalScroll(id="system"):
             yield Label("System Configuration", classes="title")
             yield Rule()
             yield Label("Hostname:")
@@ -307,73 +268,9 @@ class SystemScreen(Screen):
                         k.value,
                         value=(k == self.cfg.system.kernel),
                     )
-            yield Rule()
-            yield from _nav_buttons("prev", "next")
-        yield Footer()
 
-    @on(Button.Pressed, "#next")
-    def next_screen(self) -> None:
-        hostname = self.query_one("#hostname", Input).value.strip()
-        username = self.query_one("#username", Input).value.strip()
-        locale = self.query_one("#locale", Input).value.strip()
-        timezone = self.query_one("#timezone", Input).value.strip()
-        tmpfs = self.query_one("#tmpfs-size", Input).value.strip()
-        if not hostname:
-            self.notify("Hostname is required", severity="error")
-            return
-        if not re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$', hostname):
-            self.notify("Invalid hostname (letters, digits, hyphens only)", severity="error")
-            return
-        if not username:
-            self.notify("Username is required", severity="error")
-            return
-        if username == "root":
-            self.notify("Username must not be root", severity="error")
-            return
-        if not re.match(r'^[a-z_][a-z0-9_-]*$', username):
-            self.notify("Invalid username (lowercase, start with letter/underscore)", severity="error")
-            return
-        if not locale:
-            self.notify("Locale is required", severity="error")
-            return
-        if not timezone:
-            self.notify("Timezone is required", severity="error")
-            return
-        if not _valid_size(tmpfs):
-            self.notify("Tmpfs size must be a valid size (e.g. 8G)", severity="error")
-            return
-        self.cfg.system.hostname = hostname
-        self.cfg.system.username = username
-        self.cfg.system.locale = locale
-        self.cfg.system.timezone = timezone
-        self.cfg.system.tmpfs_size = tmpfs
-        self.cfg.system.caps_lock_remap = self.query_one("#capslock", Checkbox).value
-        kernel_set = self.query_one("#kernel", RadioSet)
-        if kernel_set.pressed_index >= 0:
-            self.cfg.system.kernel = list(Kernel)[kernel_set.pressed_index]
-        self.app.push_screen(SshScreen(self.cfg))
-
-    @on(Button.Pressed, "#prev")
-    def prev_screen(self) -> None:
-        self.app.pop_screen()
-
-    def action_back(self) -> None:
-        self.app.pop_screen()
-
-
-_NUM_KEY_SLOTS = 5
-
-
-class SshScreen(Screen):
-    BINDINGS = [Binding("escape", "back", "Back")]
-
-    def __init__(self, cfg: InstallConfig) -> None:
-        super().__init__()
-        self.cfg = cfg
-
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with VerticalScroll():
+    def _ssh_tab(self) -> ComposeResult:
+        with VerticalScroll(id="ssh"):
             yield Label("SSH Configuration", classes="title")
             yield Rule()
             yield Label("SSH policy:")
@@ -398,56 +295,9 @@ class SshScreen(Screen):
                     placeholder="ssh-ed25519 AAAA... user@host",
                     id=f"ssh-key-{i}",
                 )
-            yield Rule()
-            yield from _nav_buttons("prev", "next")
-        yield Footer()
 
-    def _collect_keys(self) -> list[str]:
-        keys = []
-        for i in range(_NUM_KEY_SLOTS):
-            val = self.query_one(f"#ssh-key-{i}", Input).value.strip()
-            if val and not val.startswith("#"):
-                keys.append(val)
-        return keys
-
-    @on(Button.Pressed, "#next")
-    def next_screen(self) -> None:
-        policy_set = self.query_one("#ssh-policy", RadioSet)
-        if policy_set.pressed_index >= 0:
-            self.cfg.system.ssh = list(SshPolicy)[policy_set.pressed_index]
-        self.cfg.system.ssh_authorized_keys = self._collect_keys()
-        if self.cfg.system.ssh == SshPolicy.ENABLE_KEYS_ONLY:
-            if not self.cfg.system.ssh_authorized_keys:
-                self.notify("Keys-only SSH requires at least one public key", severity="error")
-                return
-            valid_prefixes = (
-                "ssh-ed25519 ", "ssh-rsa ", "ssh-dss ",
-                "ecdsa-sha2-", "sk-ssh-ed25519@", "sk-ecdsa-sha2-",
-            )
-            for key in self.cfg.system.ssh_authorized_keys:
-                if not any(key.startswith(p) for p in valid_prefixes):
-                    self.notify(f"Invalid SSH key: {key[:40]}...", severity="error")
-                    return
-        self.app.push_screen(FeaturesScreen(self.cfg))
-
-    @on(Button.Pressed, "#prev")
-    def prev_screen(self) -> None:
-        self.app.pop_screen()
-
-    def action_back(self) -> None:
-        self.app.pop_screen()
-
-
-class FeaturesScreen(Screen):
-    BINDINGS = [Binding("escape", "back", "Back")]
-
-    def __init__(self, cfg: InstallConfig) -> None:
-        super().__init__()
-        self.cfg = cfg
-
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with VerticalScroll():
+    def _features_tab(self) -> ComposeResult:
+        with VerticalScroll(id="features"):
             yield Label("Features", classes="title")
             yield Rule()
             for f in Feature:
@@ -473,40 +323,9 @@ class FeaturesScreen(Screen):
                     value=(s in self.cfg.optional_services),
                     id=f"svc-{s.value}",
                 )
-            yield Rule()
-            yield from _nav_buttons("prev", "next")
-        yield Footer()
 
-    @on(Button.Pressed, "#next")
-    def next_screen(self) -> None:
-        self.cfg.features = {
-            f for f in Feature
-            if self.query_one(f"#feat-{f.value}", Checkbox).value
-        }
-        self.cfg.optional_services = {
-            s for s in OptionalService
-            if self.query_one(f"#svc-{s.value}", Checkbox).value
-        }
-        self.app.push_screen(SwayHomeScreen(self.cfg))
-
-    @on(Button.Pressed, "#prev")
-    def prev_screen(self) -> None:
-        self.app.pop_screen()
-
-    def action_back(self) -> None:
-        self.app.pop_screen()
-
-
-class SwayHomeScreen(Screen):
-    BINDINGS = [Binding("escape", "back", "Back")]
-
-    def __init__(self, cfg: InstallConfig) -> None:
-        super().__init__()
-        self.cfg = cfg
-
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with VerticalScroll():
+    def _extras_tab(self) -> ComposeResult:
+        with VerticalScroll(id="extras"):
             yield Label("sway-home & GRUB Settings", classes="title")
             yield Rule()
             yield Label("sway-home git repo:")
@@ -534,142 +353,237 @@ class SwayHomeScreen(Screen):
                 placeholder="e.g. auto, 1920x1080",
                 id="grub-gfxmode",
             )
-            yield Rule()
-            yield from _nav_buttons("prev", "next")
-        yield Footer()
 
-    @on(Button.Pressed, "#next")
-    def next_screen(self) -> None:
-        timeout = self.query_one("#grub-timeout", Input).value.strip()
-        gfxmode = self.query_one("#grub-gfxmode", Input).value.strip()
-        repo = self.query_one("#repo", Input).value.strip()
-        clone_path = self.query_one("#clone-path", Input).value.strip()
-        try:
-            self.cfg.grub.timeout = int(timeout)
-        except ValueError:
-            self.notify("GRUB timeout must be a number", severity="error")
-            return
-        if not gfxmode:
-            self.notify("GRUB graphics mode is required", severity="error")
-            return
-        if not repo:
-            self.notify("sway-home repo is required", severity="error")
-            return
-        if not clone_path:
-            self.notify("Clone path is required", severity="error")
-            return
-        self.cfg.sway_home.repo = repo
-        self.cfg.sway_home.clone_path = clone_path
-        self.cfg.grub.gfxmode = gfxmode
-        self.app.push_screen(ReviewScreen(self.cfg))
-
-    @on(Button.Pressed, "#prev")
-    def prev_screen(self) -> None:
-        self.app.pop_screen()
-
-    def action_back(self) -> None:
-        self.app.pop_screen()
-
-
-class ReviewScreen(Screen):
-    BINDINGS = [Binding("escape", "back", "Back")]
-
-    def __init__(self, cfg: InstallConfig) -> None:
-        super().__init__()
-        self.cfg = cfg
-
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with VerticalScroll():
+    def _review_tab(self) -> ComposeResult:
+        with VerticalScroll(id="review"):
             yield Label("Review Configuration", classes="title")
             yield Rule()
-            yield Static(self.cfg.to_toml(), id="toml-preview")
+            yield Static("", id="toml-preview")
+            yield Static("", id="validation-errors")
             yield Rule()
-            errors = self.cfg.validate()
-            if errors:
-                yield Label("Validation Errors:", classes="error-title")
-                for err in errors:
-                    yield Label(f"  - {err}", classes="error")
-                yield Rule()
-            yield from _nav_buttons("prev", "install", "save")
-        yield Footer()
+            with Center():
+                with Horizontal():
+                    yield Button("Install", variant="primary", id="install")
+                    yield Button("Save Config", id="save")
+
+    # --- Navigation ---
+
+    @on(ListView.Selected, "#nav")
+    def switch_tab(self, event: ListView.Selected) -> None:
+        tab_id = event.item.id
+        if tab_id:
+            key = tab_id.removeprefix("tab-")
+            self.query_one("#content", ContentSwitcher).current = key
+            if key == "review":
+                self._update_review()
+
+    def _collect_config(self) -> InstallConfig:
+        """Read all form values into the config."""
+        cfg = self.cfg
+
+        # Disk
+        if self.disks:
+            disk_set = self.query_one("#disk-list", RadioSet)
+            idx = disk_set.pressed_index
+            if idx >= 0:
+                disk = self.disks[idx]
+                cfg.disk.device = disk["device"]
+                cfg.disk.disk_type = disk["type"]
+        esp = self.query_one("#esp-size", Input).value.strip()
+        if esp:
+            cfg.disk.esp_size = esp
+        cfg.disk.trim = self.query_one("#trim", Checkbox).value
+
+        # Encryption
+        cipher = self.query_one("#cipher", Input).value.strip()
+        if cipher:
+            cfg.luks.cipher = cipher
+        try:
+            cfg.luks.key_size = int(self.query_one("#key-size", Input).value)
+        except ValueError:
+            pass
+        hash_val = self.query_one("#hash", Input).value.strip()
+        if hash_val:
+            cfg.luks.hash = hash_val
+        try:
+            cfg.luks.iter_time = int(self.query_one("#iter-time", Input).value)
+        except ValueError:
+            pass
+        boot = self.query_one("#boot-size", Input).value.strip()
+        if boot:
+            cfg.lvm.boot_size = boot
+        swap = self.query_one("#swap-size", Input).value.strip()
+        if swap:
+            cfg.lvm.swap_size = swap
+
+        # System
+        hostname = self.query_one("#hostname", Input).value.strip()
+        if hostname:
+            cfg.system.hostname = hostname
+        username = self.query_one("#username", Input).value.strip()
+        if username:
+            cfg.system.username = username
+        locale = self.query_one("#locale", Input).value.strip()
+        if locale:
+            cfg.system.locale = locale
+        timezone = self.query_one("#timezone", Input).value.strip()
+        if timezone:
+            cfg.system.timezone = timezone
+        tmpfs = self.query_one("#tmpfs-size", Input).value.strip()
+        if tmpfs:
+            cfg.system.tmpfs_size = tmpfs
+        cfg.system.caps_lock_remap = self.query_one("#capslock", Checkbox).value
+        kernel_set = self.query_one("#kernel", RadioSet)
+        if kernel_set.pressed_index >= 0:
+            cfg.system.kernel = list(Kernel)[kernel_set.pressed_index]
+
+        # SSH
+        policy_set = self.query_one("#ssh-policy", RadioSet)
+        if policy_set.pressed_index >= 0:
+            cfg.system.ssh = list(SshPolicy)[policy_set.pressed_index]
+        keys = []
+        for i in range(_NUM_KEY_SLOTS):
+            val = self.query_one(f"#ssh-key-{i}", Input).value.strip()
+            if val and not val.startswith("#"):
+                keys.append(val)
+        cfg.system.ssh_authorized_keys = keys
+
+        # Features
+        cfg.features = {
+            f for f in Feature
+            if self.query_one(f"#feat-{f.value}", Checkbox).value
+        }
+        cfg.optional_services = {
+            s for s in OptionalService
+            if self.query_one(f"#svc-{s.value}", Checkbox).value
+        }
+
+        # Extras
+        repo = self.query_one("#repo", Input).value.strip()
+        if repo:
+            cfg.sway_home.repo = repo
+        clone = self.query_one("#clone-path", Input).value.strip()
+        if clone:
+            cfg.sway_home.clone_path = clone
+        try:
+            cfg.grub.timeout = int(self.query_one("#grub-timeout", Input).value)
+        except ValueError:
+            pass
+        gfxmode = self.query_one("#grub-gfxmode", Input).value.strip()
+        if gfxmode:
+            cfg.grub.gfxmode = gfxmode
+
+        return cfg
+
+    def _validate_all(self) -> list[str]:
+        """Validate all form fields and return errors."""
+        errors: list[str] = []
+
+        # Disk
+        if self.disks:
+            disk_set = self.query_one("#disk-list", RadioSet)
+            if disk_set.pressed_index < 0:
+                errors.append("Disk: select a target disk")
+        else:
+            errors.append("Disk: no disks available")
+        esp = self.query_one("#esp-size", Input).value.strip()
+        if not _valid_size(esp):
+            errors.append("Disk: ESP size must be valid (e.g. 1G)")
+
+        # Encryption
+        if not self.query_one("#cipher", Input).value.strip():
+            errors.append("Encryption: cipher is required")
+        try:
+            int(self.query_one("#key-size", Input).value)
+        except ValueError:
+            errors.append("Encryption: key size must be a number")
+        if not self.query_one("#hash", Input).value.strip():
+            errors.append("Encryption: hash is required")
+        try:
+            int(self.query_one("#iter-time", Input).value)
+        except ValueError:
+            errors.append("Encryption: iteration time must be a number")
+        boot = self.query_one("#boot-size", Input).value.strip()
+        if not _valid_size(boot):
+            errors.append("Encryption: boot size must be valid (e.g. 1G)")
+        swap = self.query_one("#swap-size", Input).value.strip()
+        if not _valid_size(swap):
+            errors.append("Encryption: swap size must be valid (e.g. 16G)")
+
+        # System
+        hostname = self.query_one("#hostname", Input).value.strip()
+        if not hostname or not re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$', hostname):
+            errors.append("System: invalid hostname")
+        username = self.query_one("#username", Input).value.strip()
+        if not username or username == "root" or not re.match(r'^[a-z_][a-z0-9_-]*$', username):
+            errors.append("System: invalid username")
+        if not self.query_one("#locale", Input).value.strip():
+            errors.append("System: locale is required")
+        if not self.query_one("#timezone", Input).value.strip():
+            errors.append("System: timezone is required")
+        tmpfs = self.query_one("#tmpfs-size", Input).value.strip()
+        if not _valid_size(tmpfs):
+            errors.append("System: tmpfs size must be valid (e.g. 8G)")
+
+        # SSH
+        policy_set = self.query_one("#ssh-policy", RadioSet)
+        policy_idx = policy_set.pressed_index
+        if policy_idx >= 0:
+            policy = list(SshPolicy)[policy_idx]
+            if policy == SshPolicy.ENABLE_KEYS_ONLY:
+                keys = [
+                    self.query_one(f"#ssh-key-{i}", Input).value.strip()
+                    for i in range(_NUM_KEY_SLOTS)
+                    if self.query_one(f"#ssh-key-{i}", Input).value.strip()
+                ]
+                if not keys:
+                    errors.append("SSH: keys-only requires at least one public key")
+                valid_prefixes = (
+                    "ssh-ed25519 ", "ssh-rsa ", "ssh-dss ",
+                    "ecdsa-sha2-", "sk-ssh-ed25519@", "sk-ecdsa-sha2-",
+                )
+                for key in keys:
+                    if not any(key.startswith(p) for p in valid_prefixes):
+                        errors.append(f"SSH: invalid key format: {key[:30]}...")
+                        break
+
+        # Extras
+        try:
+            int(self.query_one("#grub-timeout", Input).value)
+        except ValueError:
+            errors.append("Extras: GRUB timeout must be a number")
+
+        return errors
+
+    def _update_review(self) -> None:
+        """Update the review tab with current config and validation."""
+        cfg = self._collect_config()
+        self.query_one("#toml-preview", Static).update(cfg.to_toml())
+        errors = self._validate_all()
+        if errors:
+            text = "[bold red]Validation Errors:[/]\n" + "\n".join(f"  - {e}" for e in errors)
+        else:
+            text = "[bold green]Configuration is valid.[/]"
+        self.query_one("#validation-errors", Static).update(text)
+
+    # --- Actions ---
 
     @on(Button.Pressed, "#install")
     def do_install(self) -> None:
-        errors = self.cfg.validate()
+        errors = self._validate_all()
         if errors:
             self.notify("Fix validation errors before installing", severity="error")
             return
-        self.app.result = ("install", self.cfg)
-        self.app.exit()
+        self.result = ("install", self._collect_config())
+        self.exit()
 
     @on(Button.Pressed, "#save")
     def do_save(self) -> None:
-        self.app.result = ("save", self.cfg)
-        self.app.exit()
-
-    @on(Button.Pressed, "#prev")
-    def prev_screen(self) -> None:
-        self.app.pop_screen()
-
-    def action_back(self) -> None:
-        self.app.pop_screen()
-
-
-class ArtixInstaller(App):
-    CSS = """
-    Screen {
-        align: center top;
-    }
-    VerticalScroll {
-        max-width: 80;
-        width: 100%;
-    }
-    .title {
-        text-style: bold;
-        color: $accent;
-        margin: 1 0;
-    }
-    .error-title {
-        text-style: bold;
-        color: $error;
-    }
-    .error {
-        color: $error;
-    }
-    .help {
-        color: $text-muted;
-        margin: 0 0 1 0;
-    }
-    Button {
-        margin: 1 1;
-    }
-    Input, TextArea {
-        margin: 0 0 1 0;
-    }
-    Checkbox, RadioButton {
-        margin: 0 0 0 2;
-    }
-    #toml-preview {
-        margin: 1 2;
-        padding: 1 2;
-        background: $surface;
-    }
-    """
-    TITLE = "artix-dev installer"
-    BINDINGS = [Binding("q", "quit", "Quit")]
-
-    def __init__(self, cfg: InstallConfig | None = None) -> None:
-        super().__init__()
-        self.cfg = cfg or InstallConfig()
-        self.result: tuple[str, InstallConfig] | None = None
-
-    def on_mount(self) -> None:
-        self.push_screen(DiskScreen(self.cfg))
+        self.result = ("save", self._collect_config())
+        self.exit()
 
 
 def run_tui(cfg: InstallConfig | None = None) -> tuple[str, InstallConfig] | None:
-    """Run the TUI and return (action, config) or None if quit."""
     app = ArtixInstaller(cfg)
     app.run()
     return app.result
