@@ -118,6 +118,15 @@ DEFAULT_FLATPAK_APPS: list[str] = [
 ]
 
 
+def _parse_size(size_str: str) -> int:
+    """Parse a size string like '16G' or '512M' to bytes."""
+    size_str = size_str.strip().upper()
+    multipliers = {"K": 1024, "M": 1024**2, "G": 1024**3, "T": 1024**4}
+    if size_str[-1] in multipliers:
+        return int(float(size_str[:-1]) * multipliers[size_str[-1]])
+    return int(size_str)
+
+
 @dataclass
 class InstallConfig:
     disk: DiskConfig = field(default_factory=DiskConfig)
@@ -147,25 +156,85 @@ class InstallConfig:
     )
 
     def validate(self) -> list[str]:
-        """Return a list of validation errors, empty if config is valid."""
+        """Return a list of config validation errors, empty if valid."""
+        import re
         errors: list[str] = []
+
+        # SSH keys
         if (self.system.ssh == SshPolicy.ENABLE_KEYS_ONLY
                 and not self.system.ssh_authorized_keys):
             errors.append(
-                "ssh = \"keys_only\" requires at least one ssh_authorized_keys entry"
+                'ssh = "keys_only" requires at least one ssh_authorized_keys entry'
             )
+        valid_key_prefixes = (
+            "ssh-ed25519 ", "ssh-rsa ", "ssh-dss ",
+            "ecdsa-sha2-", "sk-ssh-ed25519@", "sk-ecdsa-sha2-",
+        )
+        for i, key in enumerate(self.system.ssh_authorized_keys):
+            if not any(key.startswith(p) for p in valid_key_prefixes):
+                errors.append(
+                    f"ssh_authorized_keys[{i}] doesn't look like a valid "
+                    f"SSH public key (expected ssh-ed25519, ssh-rsa, etc.)"
+                )
+
+        # Hostname: RFC 1123
+        hn = self.system.hostname
+        if not hn or len(hn) > 63:
+            errors.append("hostname must be 1-63 characters")
+        elif not re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$', hn):
+            errors.append(
+                f'hostname "{hn}" is invalid '
+                f"(letters, digits, hyphens only, no leading/trailing hyphen)"
+            )
+
+        # Username: Linux rules
+        un = self.system.username
+        if not un:
+            errors.append("username must not be empty")
+        elif un == "root":
+            errors.append("username must not be root")
+        elif not re.match(r'^[a-z_][a-z0-9_-]*$', un):
+            errors.append(
+                f'username "{un}" is invalid '
+                f"(lowercase letters, digits, underscore, hyphen; "
+                f"must start with letter or underscore)"
+            )
+        elif len(un) > 32:
+            errors.append("username must be 32 characters or fewer")
+
+        # Timezone: check path exists in zoneinfo
+        from pathlib import Path
+        tz = self.system.timezone
+        zoneinfo_dirs = [Path("/usr/share/zoneinfo"), Path("/etc/zoneinfo")]
+        zoneinfo_root = next((d for d in zoneinfo_dirs if d.is_dir()), None)
+        if zoneinfo_root and not (zoneinfo_root / tz).exists():
+            errors.append(
+                f'timezone "{tz}" not found in {zoneinfo_root}'
+            )
+
         return errors
 
     def validate_system(self) -> list[str]:
-        """Validate against the live system (disk exists, mounted, etc.)."""
+        """Validate against the live system (disk, UEFI, network, etc.)."""
         import os
+        import socket
+        import stat
         import subprocess
         errors = self.validate()
         device = self.disk.device
+
+        # Disk exists and is a block device
         if not os.path.exists(device):
             errors.append(f"disk device {device} does not exist")
-        elif os.path.exists(device):
-            # Check if any partition on this disk is mounted
+        else:
+            try:
+                mode = os.stat(device).st_mode
+                if not stat.S_ISBLK(mode):
+                    errors.append(f"{device} is not a block device")
+            except OSError:
+                pass
+
+            # Disk not in use
             try:
                 result = subprocess.run(
                     ["lsblk", "-no", "MOUNTPOINT", device],
@@ -181,7 +250,69 @@ class InstallConfig:
                         f"(mounted: {', '.join(mountpoints)})"
                     )
             except FileNotFoundError:
-                pass  # lsblk not available, skip check
+                pass
+
+            # Disk large enough for ESP + boot + swap (root gets the rest)
+            try:
+                result = subprocess.run(
+                    ["lsblk", "-bdno", "SIZE", device],
+                    capture_output=True, text=True,
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    disk_bytes = int(result.stdout.strip())
+                    required = (
+                        _parse_size(self.disk.esp_size)
+                        + _parse_size(self.lvm.boot_size)
+                        + _parse_size(self.lvm.swap_size)
+                    )
+                    # Need at least 1GB for root beyond the fixed partitions
+                    min_root = 1 * 1024**3
+                    if disk_bytes < required + min_root:
+                        disk_gb = disk_bytes / 1024**3
+                        need_gb = (required + min_root) / 1024**3
+                        errors.append(
+                            f"disk {device} is {disk_gb:.1f}GB but "
+                            f"config requires at least {need_gb:.1f}GB "
+                            f"(ESP + boot + swap + 1GB root minimum)"
+                        )
+            except (FileNotFoundError, ValueError):
+                pass
+
+        # UEFI firmware
+        if not os.path.isdir("/sys/firmware/efi"):
+            errors.append(
+                "system is not booted in UEFI mode "
+                "(/sys/firmware/efi not found); GRUB UEFI install will fail"
+            )
+
+        # Network connectivity
+        try:
+            socket.create_connection(("archlinux.org", 443), timeout=5).close()
+        except OSError:
+            errors.append(
+                "no network connectivity (cannot reach archlinux.org); "
+                "pacman will not be able to download packages"
+            )
+
+        # Sanity: not running on an installed system
+        # Live ISOs typically mount root as tmpfs or overlayfs
+        try:
+            with open("/proc/mounts") as f:
+                for line in f:
+                    parts = line.split()
+                    if len(parts) >= 2 and parts[1] == "/":
+                        root_fs = parts[0]
+                        root_type = parts[2] if len(parts) >= 3 else ""
+                        if root_type not in ("tmpfs", "overlay", "overlayfs", "airootfs"):
+                            if root_fs.startswith("/dev/"):
+                                errors.append(
+                                    f"root filesystem is {root_fs} ({root_type}); "
+                                    f"this looks like an installed system, not a live ISO"
+                                )
+                        break
+        except OSError:
+            pass
+
         return errors
 
     @property

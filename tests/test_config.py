@@ -8,6 +8,7 @@ from artix_dev.config import (
     Kernel,
     OptionalService,
     SshPolicy,
+    _parse_size,
 )
 
 
@@ -150,31 +151,125 @@ def test_ssh_authorized_keys_roundtrip():
     ]
 
 
+def _valid_config() -> InstallConfig:
+    """Create a config that passes validation."""
+    config = InstallConfig()
+    config.system.ssh_authorized_keys = ["ssh-ed25519 AAAA... user@host"]
+    return config
+
+
 def test_validate_keys_only_requires_keys():
     config = InstallConfig()
     config.system.ssh = SshPolicy.ENABLE_KEYS_ONLY
     config.system.ssh_authorized_keys = []
     errors = config.validate()
-    assert len(errors) == 1
-    assert "ssh_authorized_keys" in errors[0]
+    assert any("ssh_authorized_keys" in e for e in errors)
 
 
 def test_validate_keys_only_with_keys():
-    config = InstallConfig()
+    config = _valid_config()
     config.system.ssh = SshPolicy.ENABLE_KEYS_ONLY
-    config.system.ssh_authorized_keys = ["ssh-ed25519 AAAA... user@host"]
     assert config.validate() == []
 
 
 def test_validate_password_no_keys_ok():
-    config = InstallConfig()
+    config = _valid_config()
     config.system.ssh = SshPolicy.ENABLE_PASSWORD
     config.system.ssh_authorized_keys = []
     assert config.validate() == []
 
 
 def test_validate_disable_no_keys_ok():
-    config = InstallConfig()
+    config = _valid_config()
     config.system.ssh = SshPolicy.DISABLE
     config.system.ssh_authorized_keys = []
     assert config.validate() == []
+
+
+def test_validate_bad_ssh_key():
+    config = _valid_config()
+    config.system.ssh_authorized_keys = ["not-a-real-key"]
+    errors = config.validate()
+    assert any("doesn't look like a valid SSH public key" in e for e in errors)
+
+
+def test_validate_good_ssh_key_types():
+    for prefix in ["ssh-ed25519 AAAA", "ssh-rsa AAAA", "ecdsa-sha2-nistp256 AAAA"]:
+        config = _valid_config()
+        config.system.ssh_authorized_keys = [f"{prefix}... user@host"]
+        assert config.validate() == [], f"Failed for {prefix}"
+
+
+def test_validate_hostname_valid():
+    config = _valid_config()
+    config.system.hostname = "my-box-01"
+    assert config.validate() == []
+
+
+def test_validate_hostname_empty():
+    config = _valid_config()
+    config.system.hostname = ""
+    errors = config.validate()
+    assert any("hostname" in e for e in errors)
+
+
+def test_validate_hostname_bad_chars():
+    config = _valid_config()
+    config.system.hostname = "my box!"
+    errors = config.validate()
+    assert any("hostname" in e for e in errors)
+
+
+def test_validate_hostname_leading_hyphen():
+    config = _valid_config()
+    config.system.hostname = "-badname"
+    errors = config.validate()
+    assert any("hostname" in e for e in errors)
+
+
+def test_validate_username_valid():
+    config = _valid_config()
+    config.system.username = "alice"
+    assert config.validate() == []
+
+
+def test_validate_username_root():
+    config = _valid_config()
+    config.system.username = "root"
+    errors = config.validate()
+    assert any("root" in e for e in errors)
+
+
+def test_validate_username_bad_chars():
+    config = _valid_config()
+    config.system.username = "Bad User"
+    errors = config.validate()
+    assert any("username" in e for e in errors)
+
+
+def test_validate_username_starts_with_digit():
+    config = _valid_config()
+    config.system.username = "1user"
+    errors = config.validate()
+    assert any("username" in e for e in errors)
+
+
+def test_validate_timezone_valid():
+    config = _valid_config()
+    config.system.timezone = "US/Mountain"
+    errors = config.validate()
+    assert not any("timezone" in e for e in errors)
+
+
+def test_validate_timezone_invalid():
+    config = _valid_config()
+    config.system.timezone = "Fake/Place"
+    errors = config.validate()
+    assert any("timezone" in e for e in errors)
+
+
+def test_parse_size():
+    assert _parse_size("1G") == 1024**3
+    assert _parse_size("16G") == 16 * 1024**3
+    assert _parse_size("512M") == 512 * 1024**2
+    assert _parse_size("1T") == 1024**4
