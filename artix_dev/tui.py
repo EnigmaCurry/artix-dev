@@ -354,13 +354,15 @@ class SystemScreen(Screen):
         self.app.pop_screen()
 
 
+_NUM_KEY_SLOTS = 5
+
+
 class SshScreen(Screen):
     BINDINGS = [Binding("escape", "back", "Back")]
 
     def __init__(self, cfg: InstallConfig) -> None:
         super().__init__()
         self.cfg = cfg
-        self.key_count = max(len(cfg.system.ssh_authorized_keys), 1)
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -381,42 +383,24 @@ class SshScreen(Screen):
                     )
             yield Rule()
             yield Label("Authorized public keys:")
-            with Vertical(id="ssh-key-list"):
-                for i in range(self.key_count):
-                    value = (self.cfg.system.ssh_authorized_keys[i]
-                             if i < len(self.cfg.system.ssh_authorized_keys) else "")
-                    yield Input(
-                        value=value,
-                        placeholder="ssh-ed25519 AAAA... user@host",
-                        id=f"ssh-key-{i}",
-                    )
-            with Center():
-                yield Button("+ Add Key", id="add-key")
+            for i in range(_NUM_KEY_SLOTS):
+                value = (self.cfg.system.ssh_authorized_keys[i]
+                         if i < len(self.cfg.system.ssh_authorized_keys) else "")
+                yield Input(
+                    value=value,
+                    placeholder="ssh-ed25519 AAAA... user@host",
+                    id=f"ssh-key-{i}",
+                )
             yield Rule()
             yield from _nav_buttons("prev", "next")
         yield Footer()
 
-    @on(Button.Pressed, "#add-key")
-    def add_key(self) -> None:
-        key_list = self.query_one("#ssh-key-list", Vertical)
-        new_input = Input(
-            value="",
-            placeholder="ssh-ed25519 AAAA... user@host",
-            id=f"ssh-key-{self.key_count}",
-        )
-        key_list.mount(new_input)
-        self.key_count += 1
-        new_input.focus()
-
     def _collect_keys(self) -> list[str]:
         keys = []
-        for i in range(self.key_count):
-            try:
-                val = self.query_one(f"#ssh-key-{i}", Input).value.strip()
-                if val and not val.startswith("#"):
-                    keys.append(val)
-            except Exception:
-                pass
+        for i in range(_NUM_KEY_SLOTS):
+            val = self.query_one(f"#ssh-key-{i}", Input).value.strip()
+            if val and not val.startswith("#"):
+                keys.append(val)
         return keys
 
     @on(Button.Pressed, "#next")
