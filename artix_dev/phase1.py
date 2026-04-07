@@ -318,6 +318,31 @@ def chroot_create_user(cfg: InstallConfig) -> None:
     )
 
 
+def chroot_configure_ssh(cfg: InstallConfig) -> None:
+    if cfg.system.ssh == SshPolicy.DISABLE:
+        return
+    heading("Configuring SSH")
+    username = cfg.system.username
+    home = f"/mnt/home/{username}"
+
+    # Install authorized keys
+    ssh_dir = f"{home}/.ssh"
+    os.makedirs(ssh_dir, mode=0o700, exist_ok=True)
+    authorized_keys = "\n".join(cfg.system.ssh_authorized_keys) + "\n"
+    write_file(f"{ssh_dir}/authorized_keys", authorized_keys, mode=0o600)
+
+    # chown to the user (look up uid/gid from /mnt/etc/passwd)
+    run_chroot("chown", "-R", f"{username}:{username}",
+               f"/home/{username}/.ssh")
+
+    if cfg.system.ssh == SshPolicy.ENABLE_KEYS_ONLY:
+        # Disable password authentication
+        run_shell(
+            "sed -i 's/^#\\?PasswordAuthentication.*/PasswordAuthentication no/' "
+            "/mnt/etc/ssh/sshd_config"
+        )
+
+
 def unmount_and_finish() -> None:
     heading("Unmounting and finishing")
     run("umount", "-R", "/mnt")
@@ -332,6 +357,12 @@ def run_phase1(cfg: InstallConfig) -> None:
     """Execute the full Phase 1 installation from the live USB."""
     if os.geteuid() != 0:
         die("Phase 1 must be run as root")
+
+    errors = cfg.validate()
+    if errors:
+        for err in errors:
+            print(f"Config error: {err}")
+        die("Fix config errors before running install")
 
     install_live_deps()
     partition_disk(cfg)
@@ -358,5 +389,6 @@ def run_phase1(cfg: InstallConfig) -> None:
     chroot_install_optional_services(cfg)
     chroot_install_extra_packages(cfg)
     chroot_create_user(cfg)
+    chroot_configure_ssh(cfg)
 
     unmount_and_finish()

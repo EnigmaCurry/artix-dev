@@ -96,6 +96,7 @@ class SystemConfig:
     caps_lock_remap: bool = True
     tmpfs_size: str = "8G"
     ssh: SshPolicy = SshPolicy.ENABLE_KEYS_ONLY
+    ssh_authorized_keys: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -144,6 +145,16 @@ class InstallConfig:
     flatpak_apps: list[str] = field(
         default_factory=lambda: list(DEFAULT_FLATPAK_APPS)
     )
+
+    def validate(self) -> list[str]:
+        """Return a list of validation errors, empty if config is valid."""
+        errors: list[str] = []
+        if (self.system.ssh == SshPolicy.ENABLE_KEYS_ONLY
+                and not self.system.ssh_authorized_keys):
+            errors.append(
+                "ssh = \"keys_only\" requires at least one ssh_authorized_keys entry"
+            )
+        return errors
 
     @property
     def kernel_package(self) -> str:
@@ -210,6 +221,10 @@ class InstallConfig:
         lines.append(f"caps_lock_remap = {str(self.system.caps_lock_remap).lower()}")
         lines.append(f'tmpfs_size = "{self.system.tmpfs_size}"')
         lines.append(f'ssh = "{self.system.ssh.value}"')
+        lines.append("ssh_authorized_keys = [")
+        for key in self.system.ssh_authorized_keys:
+            lines.append(f'    "{key}",')
+        lines.append("]")
 
         lines.append("\n[sway_home]")
         lines.append(f'repo = "{self.sway_home.repo}"')
@@ -272,6 +287,7 @@ class InstallConfig:
             caps_lock_remap=sys_data.get("caps_lock_remap", SystemConfig.caps_lock_remap),
             tmpfs_size=sys_data.get("tmpfs_size", SystemConfig.tmpfs_size),
             ssh=SshPolicy(sys_data.get("ssh", SshPolicy.ENABLE_KEYS_ONLY.value)),
+            ssh_authorized_keys=sys_data.get("ssh_authorized_keys", []),
         )
 
         sh_data = data.get("sway_home", {})

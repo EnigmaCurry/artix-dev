@@ -134,3 +134,47 @@ def test_toml_output_readable():
     assert "[flatpak]" in toml_text
     assert 'kernel = "linux-hardened"' in toml_text
     assert 'ssh = "keys_only"' in toml_text
+    assert "ssh_authorized_keys" in toml_text
+
+
+def test_ssh_authorized_keys_roundtrip():
+    config = InstallConfig()
+    config.system.ssh_authorized_keys = [
+        "ssh-ed25519 AAAA... user@host",
+        "ssh-rsa BBBB... other@host",
+    ]
+    restored = InstallConfig.from_toml(config.to_toml())
+    assert restored.system.ssh_authorized_keys == [
+        "ssh-ed25519 AAAA... user@host",
+        "ssh-rsa BBBB... other@host",
+    ]
+
+
+def test_validate_keys_only_requires_keys():
+    config = InstallConfig()
+    config.system.ssh = SshPolicy.ENABLE_KEYS_ONLY
+    config.system.ssh_authorized_keys = []
+    errors = config.validate()
+    assert len(errors) == 1
+    assert "ssh_authorized_keys" in errors[0]
+
+
+def test_validate_keys_only_with_keys():
+    config = InstallConfig()
+    config.system.ssh = SshPolicy.ENABLE_KEYS_ONLY
+    config.system.ssh_authorized_keys = ["ssh-ed25519 AAAA... user@host"]
+    assert config.validate() == []
+
+
+def test_validate_password_no_keys_ok():
+    config = InstallConfig()
+    config.system.ssh = SshPolicy.ENABLE_PASSWORD
+    config.system.ssh_authorized_keys = []
+    assert config.validate() == []
+
+
+def test_validate_disable_no_keys_ok():
+    config = InstallConfig()
+    config.system.ssh = SshPolicy.DISABLE
+    config.system.ssh_authorized_keys = []
+    assert config.validate() == []

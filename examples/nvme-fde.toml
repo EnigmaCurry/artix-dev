@@ -31,6 +31,10 @@ kernel = "linux-hardened"
 caps_lock_remap = true
 tmpfs_size = "8G"
 ssh = "keys_only"
+ssh_authorized_keys = [
+    # Paste your public key(s) here, one per line:
+    # "ssh-ed25519 AAAA... user@host",
+]
 
 [sway_home]
 repo = "https://github.com/EnigmaCurry/sway-home"
