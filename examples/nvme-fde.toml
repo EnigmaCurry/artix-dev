@@ -4,7 +4,7 @@
 [disk]
 device = "/dev/nvme0n1"
 type = "nvme"
-esp_size = "1G"
+esp_size = "512M"
 trim = true
 
 [luks]

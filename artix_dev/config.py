@@ -46,7 +46,7 @@ class SshPolicy(Enum):
 class DiskConfig:
     device: str = "/dev/nvme0n1"
     disk_type: DiskType = DiskType.NVME
-    esp_size: str = "1G"
+    esp_size: str = "512M"
     trim: bool = True  # add discard to fstab mount options
 
     @property
