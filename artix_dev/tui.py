@@ -100,11 +100,17 @@ class DiskScreen(Screen):
             yield Label("Select Target Disk", classes="title")
             yield Rule()
             if self.disks:
+                # Pre-select disk from config, or first disk
+                saved_device = self.cfg.disk.device
+                match = next(
+                    (i for i, d in enumerate(self.disks) if d["device"] == saved_device),
+                    0,
+                )
                 with RadioSet(id="disk-list"):
                     for i, d in enumerate(self.disks):
                         yield RadioButton(
                             f"{d['device']}  {d['size']}  {d['model']}",
-                            value=(i == 0),
+                            value=(i == match),
                         )
             else:
                 yield Label("No disks detected.")
