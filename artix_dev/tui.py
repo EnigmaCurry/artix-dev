@@ -100,15 +100,13 @@ class DiskScreen(Screen):
             yield Label("Select Target Disk", classes="title")
             yield Rule()
             if self.disks:
-                yield OptionList(
-                    *[f"{d['device']}  {d['size']}  {d['model']}"
-                      for d in self.disks],
-                    id="disk-list",
-                )
-                yield Label("")
+                with RadioSet(id="disk-list"):
+                    for d in self.disks:
+                        yield RadioButton(
+                            f"{d['device']}  {d['size']}  {d['model']}",
+                        )
             else:
                 yield Label("No disks detected.")
-                yield Label("")
             yield Label("ESP size:")
             yield Input(
                 value=self.cfg.disk.esp_size,
@@ -120,17 +118,14 @@ class DiskScreen(Screen):
             yield from _nav_buttons("next")
         yield Footer()
 
-    @on(OptionList.OptionSelected, "#disk-list")
-    def disk_selected(self, event: OptionList.OptionSelected) -> None:
-        self.selected_disk = event.option_index
-
     @on(Button.Pressed, "#next")
     def next_screen(self) -> None:
         if not self.disks:
             self.notify("No disks available", severity="error")
             return
-        idx = getattr(self, "selected_disk", None)
-        if idx is None:
+        disk_set = self.query_one("#disk-list", RadioSet)
+        idx = disk_set.pressed_index
+        if idx < 0:
             self.notify("Select a disk from the list", severity="error")
             return
         esp = self.query_one("#esp-size", Input).value.strip()
