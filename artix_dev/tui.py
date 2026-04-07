@@ -187,10 +187,11 @@ class ArtixInstaller(App):
             )
             has_swap = self.cfg.lvm.swap_size != "0"
             yield Checkbox("Enable swap", value=has_swap, id="swap-enable")
-            yield Label("LVM swap size:")
+            yield Label("LVM swap size:", id="swap-size-label")
             yield Input(
                 value=self.cfg.lvm.swap_size if has_swap else "",
                 placeholder="e.g. 16G (match RAM for hibernate)",
+                disabled=not has_swap,
                 id="swap-size",
             )
 
@@ -378,6 +379,10 @@ class ArtixInstaller(App):
             self.query_one("#content", ContentSwitcher).current = key
             if key == "review":
                 self._update_review()
+
+    @on(Checkbox.Changed, "#swap-enable")
+    def swap_toggled(self, event: Checkbox.Changed) -> None:
+        self.query_one("#swap-size", Input).disabled = not event.value
 
     def _collect_config(self) -> InstallConfig:
         """Read all form values into the config."""
