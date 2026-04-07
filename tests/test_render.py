@@ -1,8 +1,10 @@
-"""Tests for bash script rendering."""
+"""Tests for Python script rendering."""
+
+import ast
 
 import pytest
 
-from artix_dev.config import DiskType, Feature, InstallConfig, Kernel, SshPolicy
+from artix_dev.config import DiskType, InstallConfig, Kernel, SshPolicy
 from artix_dev.render import render_phase1
 
 
@@ -15,92 +17,86 @@ def _valid_config(**overrides) -> InstallConfig:
     return cfg
 
 
-def test_render_produces_bash():
+def _parse_and_exec(script: str) -> dict:
+    """Parse the script, strip the __main__ block, exec it, return namespace."""
+    tree = ast.parse(script)
+    tree.body = [
+        node for node in tree.body
+        if not (
+            isinstance(node, ast.If)
+            and isinstance(node.test, ast.Compare)
+            and any(
+                isinstance(c, ast.Constant) and c.value == "__main__"
+                for c in node.test.comparators
+            )
+        )
+    ]
+    code = compile(tree, "<render>", "exec")
+    ns: dict = {}
+    exec(code, ns)
+    return ns
+
+
+def test_render_valid_python():
     script = render_phase1(_valid_config())
-    assert script.startswith("#!/bin/bash\n")
-    assert "set -euo pipefail" in script
+    ast.parse(script)
 
 
-def test_render_contains_all_sections():
+def test_render_header():
     script = render_phase1(_valid_config())
-    assert "Partitioning disk" in script
-    assert "Setting up LUKS" in script
-    assert "Setting up LVM" in script
-    assert "Formatting partitions" in script
-    assert "Mounting partitions" in script
-    assert "Installing base system" in script
-    assert "Generating fstab" in script
-    assert "Setting root password" in script
-    assert "Configuring locale" in script
-    assert "Configuring timezone" in script
-    assert "Setting hostname" in script
-    assert "Configuring mkinitcpio" in script
-    assert "Configuring GRUB" in script
-    assert "Installing GRUB" in script
-    assert "Enabling base dinit services" in script
-    assert "Creating user account" in script
-    assert "Configuring SSH" in script
-    assert "Unmounting and finishing" in script
+    assert script.startswith("#!/usr/bin/env python3\n")
+    assert "from __future__ import annotations" in script
 
 
-def test_render_bakes_config_values():
+def test_render_embeds_config():
     cfg = _valid_config()
+    cfg.system.hostname = "mybox"
     cfg.disk.device = "/dev/sda"
     cfg.disk.disk_type = DiskType.OTHER
-    cfg.system.hostname = "mybox"
     cfg.system.kernel = Kernel.ZEN
     script = render_phase1(cfg)
-    assert "DISK=/dev/sda" in script
-    assert "PART=/dev/sda" in script
-    assert "HOSTNAME=mybox" in script
-    assert "KERNEL=linux-zen" in script
+
+    ns = _parse_and_exec(script)
+    restored = ns["InstallConfig"].from_toml(ns["_TOML_CONFIG"])
+    assert restored.system.hostname == "mybox"
+    assert restored.disk.device == "/dev/sda"
+    assert restored.disk.disk_type.value == "other"
+    assert restored.system.kernel.value == "linux-zen"
 
 
-def test_render_trim_disabled():
+def test_render_config_validates():
     cfg = _valid_config()
-    cfg.disk.trim = False
     script = render_phase1(cfg)
-    assert "blkdiscard" not in script
-    assert "allow-discards" not in script
-    assert "discard" not in script
+    ns = _parse_and_exec(script)
+    restored = ns["InstallConfig"].from_toml(ns["_TOML_CONFIG"])
+    assert restored.validate() == []
 
 
-def test_render_no_capslock():
-    cfg = _valid_config()
-    cfg.system.caps_lock_remap = False
-    script = render_phase1(cfg)
-    assert "Caps Lock" not in script
-    assert "personal.map" not in script
+def test_render_has_run_phase1():
+    script = render_phase1(_valid_config())
+    ns = _parse_and_exec(script)
+    assert callable(ns["run_phase1"])
 
 
-def test_render_ssh_disabled():
-    cfg = _valid_config()
-    cfg.system.ssh = SshPolicy.DISABLE
-    cfg.system.ssh_authorized_keys = []
-    script = render_phase1(cfg)
-    assert "Configuring SSH" not in script
-    assert "authorized_keys" not in script
-    assert "sshd" not in script
+def test_render_has_main_block():
+    script = render_phase1(_valid_config())
+    assert 'if __name__ == "__main__":' in script
+    assert "run_phase1(cfg)" in script
 
 
-def test_render_ssh_password():
-    cfg = _valid_config()
-    cfg.system.ssh = SshPolicy.ENABLE_PASSWORD
-    cfg.system.ssh_authorized_keys = ["ssh-ed25519 AAAA... user@host"]
-    script = render_phase1(cfg)
-    assert "PasswordAuthentication" not in script
-    assert "authorized_keys" in script
-
-
-def test_render_authorized_keys_in_script():
+def test_render_ssh_keys_embedded():
     cfg = _valid_config()
     cfg.system.ssh_authorized_keys = [
         "ssh-ed25519 AAAA... alice@laptop",
         "ssh-rsa BBBB... bob@desktop",
     ]
     script = render_phase1(cfg)
-    assert "ssh-ed25519 AAAA... alice@laptop" in script
-    assert "ssh-rsa BBBB... bob@desktop" in script
+    ns = _parse_and_exec(script)
+    restored = ns["InstallConfig"].from_toml(ns["_TOML_CONFIG"])
+    assert restored.system.ssh_authorized_keys == [
+        "ssh-ed25519 AAAA... alice@laptop",
+        "ssh-rsa BBBB... bob@desktop",
+    ]
 
 
 def test_render_validation_fails_without_keys():
@@ -111,7 +107,11 @@ def test_render_validation_fails_without_keys():
         render_phase1(cfg)
 
 
-def test_render_root_check():
-    script = render_phase1(_valid_config())
-    assert "EUID" in script
-    assert "must be run as root" in script
+def test_render_features_preserved():
+    from artix_dev.config import Feature
+    cfg = _valid_config()
+    cfg.features = {Feature.NIX, Feature.PODMAN}
+    script = render_phase1(cfg)
+    ns = _parse_and_exec(script)
+    restored = ns["InstallConfig"].from_toml(ns["_TOML_CONFIG"])
+    assert {f.value for f in restored.features} == {"nix", "podman"}
