@@ -376,6 +376,10 @@ def run_phase2(cfg: InstallConfig, dry_run: bool = False) -> None:
     setup_sway_home(cfg)
     setup_flatpak(cfg)
 
+    # Remove phase 1 MOTD
+    if _path_exists("/etc/motd"):
+        run("rm", "/etc/motd")
+
     heading("Phase 2 complete")
     print("Log out and back in to pick up all changes.")
     print("If greetd was installed, it will be available on next boot.")
