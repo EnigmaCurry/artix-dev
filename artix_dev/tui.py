@@ -87,7 +87,8 @@ class DiskScreen(Screen):
                 yield Label("No disks detected. Enter device path manually:")
             yield Label("\nDevice path:")
             yield Input(
-                value=self.cfg.disk.device,
+                value="",
+                placeholder="Select a disk above or type a device path",
                 id="device",
             )
             yield Label("ESP size:")
