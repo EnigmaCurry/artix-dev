@@ -284,29 +284,32 @@ def setup_sway_home(cfg: InstallConfig) -> None:
     if not _pkg_installed("git"):
         run("pacman", "-S", "--noconfirm", "git", "just")
 
-    if _is_dir(clone_path):
-        print(f"  {clone_path} already exists, skipping clone.")
-    else:
-        # Backup existing dotfiles
+    # Backup existing dotfiles (only if originals haven't been backed up yet)
+    if not _path_exists(f"{home}/.bashrc.orig") and _path_exists(f"{home}/.bashrc"):
         for f in [".config", ".bashrc", ".bash_profile"]:
             src = f"{home}/{f}"
             if _path_exists(src):
                 run_as_user(username, "mv", src, f"{src}.orig")
 
-        # Enable flakes
-        nix_config_dir = f"{home}/.config/nix"
-        makedirs(nix_config_dir, exist_ok=True)
-        nix_conf = f"{nix_config_dir}/nix.conf"
-        if not _file_contains(nix_conf, "flakes"):
-            write_file(nix_conf, "experimental-features = nix-command flakes\n")
+    # Enable flakes
+    nix_config_dir = f"{home}/.config/nix"
+    makedirs(nix_config_dir, exist_ok=True)
+    nix_conf = f"{nix_config_dir}/nix.conf"
+    if not _file_contains(nix_conf, "flakes"):
+        write_file(nix_conf, "experimental-features = nix-command flakes\n")
 
-        # Clone and install
+    # Clone repo
+    if _is_dir(clone_path):
+        print(f"  {clone_path} already exists, skipping clone.")
+    else:
         clone_parent = os.path.dirname(clone_path)
         run_as_user(username, "mkdir", "-p", clone_parent)
         run_as_user(username,
                     "git", "clone", cfg.sway_home.repo, clone_path)
-        run_as_user(username,
-                    f"cd {clone_path} && just hm-install")
+
+    # Run hm-install (idempotent — home-manager switch is safe to re-run)
+    run_as_user(username,
+                f"cd {clone_path} && just hm-install")
 
     # Fix ownership of nix config
     run("chown", "-R", f"{username}:{username}", f"{home}/.config")
