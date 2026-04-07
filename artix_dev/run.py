@@ -69,6 +69,20 @@ def symlink(src: str, dst: str) -> None:
         os.symlink(src, dst)
 
 
+def run_as_user(username: str, *args: str) -> None:
+    """Run a command as a specific user via su."""
+    cmd = ["su", "-l", username, "-c", " ".join(args)]
+    print(f">>> [{username}] {' '.join(args)}", flush=True)
+    if not DRY_RUN:
+        subprocess.run(cmd, check=True)
+
+
+def run_output(*args: str) -> str:
+    """Run a command and return its stdout. Not affected by DRY_RUN."""
+    result = subprocess.run(args, capture_output=True, text=True)
+    return result.stdout.strip()
+
+
 def heading(msg: str) -> None:
     """Print a section heading."""
     print(f"\n{'=' * 60}", flush=True)
