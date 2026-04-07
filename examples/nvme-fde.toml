@@ -51,4 +51,4 @@ extra = [
 ]
 
 [flatpak]
-apps = ["org.fedoraproject.MediaWriter"]
+apps = ["org.fedoraproject.MediaWriter", "io.github.kolunmi.Bazaar"]
