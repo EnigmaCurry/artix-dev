@@ -365,6 +365,7 @@ class SshScreen(Screen):
     def __init__(self, cfg: InstallConfig) -> None:
         super().__init__()
         self.cfg = cfg
+        self.key_count = max(len(cfg.system.ssh_authorized_keys), 1)
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -384,26 +385,51 @@ class SshScreen(Screen):
                         value=(p == self.cfg.system.ssh),
                     )
             yield Rule()
-            yield Label("Authorized public keys (one per line):")
-            yield TextArea(
-                "\n".join(self.cfg.system.ssh_authorized_keys) or "",
-                id="ssh-keys",
-            )
-            yield Label("Paste ssh-ed25519, ssh-rsa, or ecdsa keys", classes="help")
+            yield Label("Authorized public keys:")
+            with Vertical(id="ssh-key-list"):
+                for i in range(self.key_count):
+                    value = (self.cfg.system.ssh_authorized_keys[i]
+                             if i < len(self.cfg.system.ssh_authorized_keys) else "")
+                    yield Input(
+                        value=value,
+                        placeholder="ssh-ed25519 AAAA... user@host",
+                        id=f"ssh-key-{i}",
+                    )
+            with Center():
+                yield Button("+ Add Key", id="add-key")
             yield Rule()
             yield from _nav_buttons("prev", "next")
         yield Footer()
+
+    @on(Button.Pressed, "#add-key")
+    def add_key(self) -> None:
+        key_list = self.query_one("#ssh-key-list", Vertical)
+        new_input = Input(
+            value="",
+            placeholder="ssh-ed25519 AAAA... user@host",
+            id=f"ssh-key-{self.key_count}",
+        )
+        key_list.mount(new_input)
+        self.key_count += 1
+        new_input.focus()
+
+    def _collect_keys(self) -> list[str]:
+        keys = []
+        for i in range(self.key_count):
+            try:
+                val = self.query_one(f"#ssh-key-{i}", Input).value.strip()
+                if val and not val.startswith("#"):
+                    keys.append(val)
+            except Exception:
+                pass
+        return keys
 
     @on(Button.Pressed, "#next")
     def next_screen(self) -> None:
         policy_set = self.query_one("#ssh-policy", RadioSet)
         if policy_set.pressed_index >= 0:
             self.cfg.system.ssh = list(SshPolicy)[policy_set.pressed_index]
-        keys_text = self.query_one("#ssh-keys", TextArea).text
-        self.cfg.system.ssh_authorized_keys = [
-            line.strip() for line in keys_text.splitlines()
-            if line.strip() and not line.strip().startswith("#")
-        ]
+        self.cfg.system.ssh_authorized_keys = self._collect_keys()
         if self.cfg.system.ssh == SshPolicy.ENABLE_KEYS_ONLY:
             if not self.cfg.system.ssh_authorized_keys:
                 self.notify("Keys-only SSH requires at least one public key", severity="error")
@@ -414,7 +440,7 @@ class SshScreen(Screen):
             )
             for key in self.cfg.system.ssh_authorized_keys:
                 if not any(key.startswith(p) for p in valid_prefixes):
-                    self.notify(f"Invalid SSH key format: {key[:40]}...", severity="error")
+                    self.notify(f"Invalid SSH key: {key[:40]}...", severity="error")
                     return
         self.app.push_screen(FeaturesScreen(self.cfg))
 
