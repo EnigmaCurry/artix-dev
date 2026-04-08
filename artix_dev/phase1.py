@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -75,7 +76,10 @@ def setup_luks(cfg: InstallConfig) -> None:
     luks = cfg.luks
     part = cfg.disk.luks_partition
 
-    run("cryptsetup", "benchmark")
+    try:
+        run("cryptsetup", "benchmark")
+    except subprocess.CalledProcessError:
+        print("  (benchmark unavailable, skipping)")
     print("\n  Enter a secure passphrase for disk encryption.")
     print("  You will be prompted to enter it twice for verification.\n")
     run("cryptsetup",
