@@ -68,6 +68,8 @@ def setup_luks(cfg: InstallConfig) -> None:
     part = cfg.disk.luks_partition
 
     run("cryptsetup", "benchmark")
+    print("\n  Enter a secure passphrase for disk encryption.")
+    print("  You will be prompted to enter it twice for verification.\n")
     run("cryptsetup",
         "--batch-mode",
         "--verbose",
