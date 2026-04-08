@@ -30,7 +30,7 @@ username = "user"
 kernel = "linux-hardened"
 caps_lock_remap = true
 tmpfs_size = "8G"
-ssh = "keys_only"
+ssh = "password"
 ssh_authorized_keys = [
     # Paste your public key(s) here, one per line:
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINeIyA5BHv4nPttFn10ailg/82PQJ5y7WQDrG8/oV42T test@artix-dev",

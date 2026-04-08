@@ -22,9 +22,9 @@ def test_optional_service_packages_complete():
 
 
 def test_base_services_include_sshd_by_default():
-    """SSH is enabled by default (keys_only policy)."""
+    """SSH is enabled by default (password policy)."""
     cfg = InstallConfig()
-    assert cfg.system.ssh == SshPolicy.ENABLE_KEYS_ONLY
+    assert cfg.system.ssh == SshPolicy.ENABLE_PASSWORD
     symlinks: list[str] = []
     with patch("artix_dev.phase1.symlink", side_effect=lambda src, dst: symlinks.append(dst)):
         chroot_enable_services(cfg)
