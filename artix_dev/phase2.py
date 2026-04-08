@@ -308,6 +308,16 @@ def setup_sway_home(cfg: InstallConfig) -> None:
         run_as_user(username,
                     "git", "clone", cfg.sway_home.repo, clone_path)
 
+    # Set up git config so hm-install doesn't prompt interactively
+    git_config = f"{home}/.config/git/config.local"
+    if not _path_exists(git_config) and cfg.system.git_name and cfg.system.git_email:
+        makedirs(f"{home}/.config/git", exist_ok=True)
+        write_file(git_config,
+                   f"[user]\n"
+                   f"    name = {cfg.system.git_name}\n"
+                   f"    email = {cfg.system.git_email}\n")
+        run("chown", "-R", f"{username}:{username}", f"{home}/.config/git")
+
     # Run hm-install (idempotent — home-manager switch is safe to re-run)
     run_as_user(username,
                 f"cd {clone_path} && just hm-install")

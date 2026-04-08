@@ -127,6 +127,8 @@ class SystemConfig:
     kernel: Kernel = Kernel.HARDENED
     caps_lock_remap: bool = True
     tmpfs_size: str = ""
+    git_name: str = ""
+    git_email: str = ""
     ssh: SshPolicy = SshPolicy.DISABLE
     ssh_authorized_keys: list[str] = field(default_factory=list)
 
@@ -425,6 +427,8 @@ class InstallConfig:
         lines.append(f'kernel = "{self.system.kernel.value}"')
         lines.append(f"caps_lock_remap = {str(self.system.caps_lock_remap).lower()}")
         lines.append(f'tmpfs_size = "{self.system.tmpfs_size}"')
+        lines.append(f'git_name = "{self.system.git_name}"')
+        lines.append(f'git_email = "{self.system.git_email}"')
         lines.append(f'ssh = "{self.system.ssh.value}"')
         lines.append("ssh_authorized_keys = [")
         for key in self.system.ssh_authorized_keys:
@@ -491,6 +495,8 @@ class InstallConfig:
             kernel=Kernel(sys_data.get("kernel", Kernel.HARDENED.value)),
             caps_lock_remap=sys_data.get("caps_lock_remap", SystemConfig.caps_lock_remap),
             tmpfs_size=sys_data.get("tmpfs_size", SystemConfig.tmpfs_size),
+            git_name=sys_data.get("git_name", SystemConfig.git_name),
+            git_email=sys_data.get("git_email", SystemConfig.git_email),
             ssh=SshPolicy(sys_data.get("ssh", SshPolicy.DISABLE.value)),
             ssh_authorized_keys=sys_data.get("ssh_authorized_keys", []),
         )

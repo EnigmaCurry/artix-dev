@@ -402,6 +402,18 @@ class ArtixInstaller(App):
                 placeholder="e.g. 8G (half of RAM is typical)",
                 id="tmpfs-size",
             )
+            yield Label("Git user.name:")
+            yield Input(
+                value=self.cfg.system.git_name,
+                placeholder="e.g. Jane Doe",
+                id="git-name",
+            )
+            yield Label("Git user.email:")
+            yield Input(
+                value=self.cfg.system.git_email,
+                placeholder="e.g. jane@example.com",
+                id="git-email",
+            )
             yield Checkbox(
                 "Remap Caps Lock to Control",
                 value=self.cfg.system.caps_lock_remap,
@@ -596,6 +608,8 @@ class ArtixInstaller(App):
         tmpfs = self.query_one("#tmpfs-size", Input).value.strip()
         if tmpfs:
             cfg.system.tmpfs_size = tmpfs
+        cfg.system.git_name = self.query_one("#git-name", Input).value.strip()
+        cfg.system.git_email = self.query_one("#git-email", Input).value.strip()
         cfg.system.caps_lock_remap = self.query_one("#capslock", Checkbox).value
         kernel_set = self.query_one("#kernel", RadioSet)
         if kernel_set.pressed_index >= 0:
