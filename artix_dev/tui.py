@@ -203,9 +203,8 @@ class ArtixInstaller(App):
             yield Label("Welcome to artix-dev", classes="title")
             yield Rule()
             yield Static(
-                "[italic]This is an unofficial community installer for\n"
-                "Artix Linux. It is not affiliated with the Artix\n"
-                "Linux project.[/]\n"
+                "[italic]This is an unofficial community installer, not\n"
+                "affiliated with the Artix Linux project.[/]\n"
                 "\n"
                 "artix-dev sets up Artix Linux with full disk encryption\n"
                 "(LUKS + LVM), the dinit init system, and optionally a\n"
