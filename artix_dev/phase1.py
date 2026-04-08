@@ -49,6 +49,26 @@ def install_live_deps() -> None:
         "gptfdisk", "parted", "cryptsetup", "lvm2", "dosfstools")
 
 
+def cleanup_previous_install() -> None:
+    """Clean up leftover LVM/LUKS state from a previous attempt."""
+    heading("Cleaning up previous install state")
+    # Deactivate LVM volume group if active
+    if Path("/dev/mapper/vg0-volRoot").exists():
+        run("umount", "-R", "/mnt", allow_fail=True)
+        run("lvchange", "-an", "vg0", allow_fail=True)
+    if Path("/dev/mapper/vg0-volSwap").exists():
+        run("swapoff", "/dev/mapper/vg0-volSwap", allow_fail=True)
+        run("lvchange", "-an", "vg0", allow_fail=True)
+    if Path("/dev/mapper/vg0-volBoot").exists():
+        run("lvchange", "-an", "vg0", allow_fail=True)
+    # Remove VG
+    if Path("/dev/vg0").exists():
+        run("vgremove", "-f", "vg0", allow_fail=True)
+    # Close LUKS
+    if Path("/dev/mapper/lvm-system").exists():
+        run("cryptsetup", "luksClose", "lvm-system", allow_fail=True)
+
+
 def partition_disk(cfg: InstallConfig) -> None:
     heading("Partitioning disk")
     disk = cfg.disk.device
@@ -462,6 +482,7 @@ def run_phase1(cfg: InstallConfig, dry_run: bool = False,
                 die("Aborted by user")
 
     install_live_deps()
+    cleanup_previous_install()
     partition_disk(cfg)
     setup_luks(cfg)
     setup_lvm(cfg)

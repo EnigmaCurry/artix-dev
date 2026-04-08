@@ -8,11 +8,13 @@ import sys
 DRY_RUN = False
 
 
-def run(*args: str) -> None:
-    """Run a command, printing it first. Raises on failure."""
+def run(*args: str, allow_fail: bool = False) -> None:
+    """Run a command, printing it first. Raises on failure unless allow_fail."""
     print(f">>> {' '.join(args)}", flush=True)
     if not DRY_RUN:
-        subprocess.run(args, check=True)
+        result = subprocess.run(args, check=not allow_fail)
+        if allow_fail and result.returncode != 0:
+            print(f"  (exited {result.returncode}, continuing)")
 
 
 def run_chroot(*args: str) -> None:
