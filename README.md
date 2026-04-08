@@ -53,7 +53,7 @@ artix-dev setup
 ```
 
 This runs phase 2: system update, Podman, libvirt, Nix, Sway desktop,
-sway-home dotfiles, and Flatpak. Log out and back in when finished.
+sway-home dotfiles, and Flatpak. Reboot when finished.
 
 ## What it does
 
