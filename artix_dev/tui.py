@@ -266,13 +266,13 @@ class ArtixInstaller(App):
                         )
             else:
                 yield Label("No disks detected.")
-            yield Label("ESP size:")
+            yield Checkbox("Enable SSD TRIM", value=self.cfg.disk.trim, id="trim")
+            yield Label("ESP (UEFI) size:")
             yield Input(
                 value=self.cfg.disk.esp_size,
                 placeholder="e.g. 1G, 512M",
                 id="esp-size",
             )
-            yield Checkbox("Enable SSD TRIM", value=self.cfg.disk.trim, id="trim")
             yield Rule()
             yield Label("LVM boot size:")
             yield Input(
