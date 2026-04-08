@@ -143,6 +143,12 @@ class ArtixInstaller(App):
     .error {
         color: $error;
     }
+    #tab-nav-bar {
+        height: auto;
+    }
+    #tab-nav-bar #save {
+        dock: right;
+    }
     Button {
         margin: 1 1;
     }
@@ -189,12 +195,12 @@ class ArtixInstaller(App):
         yield Footer()
 
     def _tab_nav(self) -> ComposeResult:
-        """Save and Next buttons for each tab."""
+        """Previous, Next, and Save and Exit buttons for each tab."""
         yield Rule()
-        with Center():
-            with Horizontal():
-                yield Button("Save and Exit", id="save")
-                yield Button("Next", variant="primary", id="next")
+        with Horizontal(id="tab-nav-bar"):
+            yield Button("Previous", id="prev")
+            yield Button("Next", variant="primary", id="next")
+            yield Button("Save and Exit", id="save")
 
     # --- Tab content ---
 
@@ -680,6 +686,23 @@ class ArtixInstaller(App):
             nav = self.query_one("#nav", ListView)
             nav.index = idx + 1
             if next_key == "review":
+                self._update_review()
+
+    @on(Button.Pressed, "#prev")
+    def do_prev(self) -> None:
+        switcher = self.query_one("#content", ContentSwitcher)
+        current = switcher.current
+        tab_keys = [k for k, _ in TABS]
+        try:
+            idx = tab_keys.index(current)
+        except ValueError:
+            return
+        if idx > 0:
+            prev_key = tab_keys[idx - 1]
+            switcher.current = prev_key
+            nav = self.query_one("#nav", ListView)
+            nav.index = idx - 1
+            if prev_key == "review":
                 self._update_review()
 
     @on(Button.Pressed, "#delete-config")
