@@ -674,7 +674,8 @@ class ArtixInstaller(App):
     def _update_review(self) -> None:
         """Update the review tab with current config and validation."""
         cfg = self._collect_config()
-        self.query_one("#toml-preview", Static).update(cfg.to_toml())
+        from rich.text import Text
+        self.query_one("#toml-preview", Static).update(Text(cfg.to_toml()))
         errors = self._validate_all()
         if errors:
             text = "[bold red]Validation Errors:[/]\n" + "\n".join(f"  - {e}" for e in errors)
