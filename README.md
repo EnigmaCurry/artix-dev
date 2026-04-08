@@ -19,8 +19,9 @@ nmtui    # connect to WiFi or configure ethernet
 
 #### Remote install via SSH (optional)
 
-If you prefer to run the install from another machine (easier to
-copy/paste, scroll back, etc.), enable SSH on the live ISO:
+If you prefer to run the install from another machine (mouse support
+in the TUI, easier to copy/paste, scroll back, etc.), enable SSH on
+the live ISO:
 
 ```bash
 passwd                        # set a password for the artix user
