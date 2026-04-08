@@ -193,7 +193,7 @@ class ArtixInstaller(App):
                 )
             with Vertical(id="main"):
                 with Horizontal(id="top-nav"):
-                    yield Button("Previous", id="prev")
+                    yield Button("Prev", id="prev")
                     yield Button("Next", variant="primary", id="next")
                 with ContentSwitcher(id="content", initial="welcome"):
                     yield from self._welcome_tab()
