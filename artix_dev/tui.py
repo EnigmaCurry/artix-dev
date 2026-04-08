@@ -160,6 +160,9 @@ class ArtixInstaller(App):
     #top-nav .spacer {
         width: 1fr;
     }
+    #top-nav #install {
+        margin: 0 1;
+    }
     #top-nav #prev, #top-nav #next {
         margin: 0 1;
         min-width: 8;
