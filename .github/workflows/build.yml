@@ -63,7 +63,7 @@ jobs:
             Download and run on the Artix live ISO:
             ```bash
             curl -sLO https://github.com/${{ github.repository }}/releases/download/latest/artix-dev.pyz
-            sudo python3 artix-dev.pyz install
+            python artix-dev.pyz install
             ```
           files: artix-dev.pyz
           prerelease: true
