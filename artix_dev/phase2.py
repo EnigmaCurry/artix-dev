@@ -294,6 +294,7 @@ def setup_sway_home(cfg: InstallConfig) -> None:
     # Enable flakes
     nix_config_dir = f"{home}/.config/nix"
     makedirs(nix_config_dir, exist_ok=True)
+    run("chown", "-R", f"{username}:{username}", f"{home}/.config")
     nix_conf = f"{nix_config_dir}/nix.conf"
     if not _file_contains(nix_conf, "flakes"):
         write_file(nix_conf, "experimental-features = nix-command flakes\n")
