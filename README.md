@@ -10,8 +10,30 @@ project.
 
 ## Quick start
 
-Boot the [Artix base dinit ISO](https://artixlinux.org/download.php),
-connect to the network, then:
+Boot the [Artix base dinit ISO](https://artixlinux.org/download.php)
+and connect to the network:
+
+```bash
+nmtui    # connect to WiFi or configure ethernet
+```
+
+#### Remote install via SSH (optional)
+
+If you prefer to run the install from another machine (easier to
+copy/paste, scroll back, etc.), enable SSH on the live ISO:
+
+```bash
+passwd                        # set a password for the artix user
+sudo dinitctl start sshd      # start the SSH server
+```
+
+Then SSH in from your other machine:
+
+```bash
+ssh artix@<ip-address>
+```
+
+#### Run the installer
 
 ```bash
 curl -sLO https://github.com/EnigmaCurry/artix-dev/releases/download/latest/artix-dev.pyz
