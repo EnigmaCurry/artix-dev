@@ -143,11 +143,16 @@ class ArtixInstaller(App):
     .error {
         color: $error;
     }
+    #top-nav {
+        dock: top;
+        height: auto;
+        align: right top;
+    }
+    #top-nav Button {
+        margin: 0 1;
+    }
     #tab-nav-bar {
         height: auto;
-    }
-    #tab-nav-bar #save {
-        dock: right;
     }
     Button {
         margin: 1 1;
@@ -176,6 +181,9 @@ class ArtixInstaller(App):
 
     def compose(self) -> ComposeResult:
         yield Header()
+        with Horizontal(id="top-nav"):
+            yield Button("Previous", id="prev")
+            yield Button("Next", variant="primary", id="next")
         with Horizontal(id="layout"):
             with Vertical(id="sidebar"):
                 yield ListView(
@@ -195,11 +203,9 @@ class ArtixInstaller(App):
         yield Footer()
 
     def _tab_nav(self) -> ComposeResult:
-        """Previous, Next, and Save and Exit buttons for each tab."""
+        """Save and Exit button for each tab."""
         yield Rule()
         with Horizontal(id="tab-nav-bar"):
-            yield Button("Previous", id="prev")
-            yield Button("Next", variant="primary", id="next")
             yield Button("Save and Exit", id="save")
 
     # --- Tab content ---
