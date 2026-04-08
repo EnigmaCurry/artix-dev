@@ -203,7 +203,7 @@ class ArtixInstaller(App):
                     yield from self._features_tab()
                     yield from self._extras_tab()
                     yield from self._advanced_tab()
-                yield from self._review_tab()
+                    yield from self._review_tab()
         yield Footer()
 
     def _tab_nav(self) -> ComposeResult:
