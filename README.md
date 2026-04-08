@@ -25,6 +25,7 @@ copy/paste, scroll back, etc.), enable SSH on the live ISO:
 ```bash
 passwd                        # set a password for the artix user
 sudo dinitctl start sshd      # start the SSH server
+ip a                          # note your IP address
 ```
 
 Then SSH in from your other machine:
