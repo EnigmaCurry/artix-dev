@@ -29,7 +29,12 @@ def _ensure_root(config_file: str | None = None) -> None:
     cmd_args = [a for a in sys.argv[1:] if not a.endswith(".toml")]
     if config_file:
         cmd_args.append(config_file)
-    os.execvp("sudo", ["sudo", sys.executable, "-m", "artix_dev"] + cmd_args)
+    # Detect if running from a .pyz zipapp vs normal module
+    main_script = Path(sys.argv[0]).resolve()
+    if main_script.suffix == ".pyz":
+        os.execvp("sudo", ["sudo", sys.executable, str(main_script)] + cmd_args)
+    else:
+        os.execvp("sudo", ["sudo", sys.executable, "-m", "artix_dev"] + cmd_args)
 
 DEFAULT_CONFIG = Path("/root/artix-dev/config.toml")
 
