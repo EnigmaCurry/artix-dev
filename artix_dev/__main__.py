@@ -97,11 +97,14 @@ def main() -> None:
         dry_run = "--dry-run" in rest
         rest = [a for a in rest if a != "--dry-run"]
 
+        if not dry_run:
+            _ensure_root(None)
+
         if rest:
             cfg, config_file = _load_config(rest)
         else:
             from artix_dev.tui import run_tui
-            saved = Path("artix-dev.toml")
+            saved = DEFAULT_CONFIG
             while True:
                 prev_cfg = InstallConfig.load(saved) if saved.exists() else None
                 saved_str = str(saved) if saved.exists() else None
@@ -113,23 +116,13 @@ def main() -> None:
                 if action == "reset":
                     continue  # re-launch TUI with fresh config
                 # Save for next run
+                saved.parent.mkdir(parents=True, exist_ok=True)
                 cfg.save(saved)
                 if action == "save":
                     print(f"Config saved to {saved}")
                     sys.exit(0)
                 break  # action == "install"
-            # Save TUI config to temp file so sudo re-exec can find it
-            import tempfile
-            tmp = tempfile.NamedTemporaryFile(
-                mode="w", suffix=".toml", prefix="artix-dev-",
-                delete=False,
-            )
-            tmp.write(cfg.to_toml())
-            tmp.close()
-            config_file = tmp.name
-
-        if not dry_run:
-            _ensure_root(config_file)
+            config_file = str(saved)
         from artix_dev.phase1 import run_phase1
         run_phase1(cfg, dry_run=dry_run, config_path=config_file)
 
