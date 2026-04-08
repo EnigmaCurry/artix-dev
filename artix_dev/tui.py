@@ -311,22 +311,38 @@ class ArtixInstaller(App):
             yield Label("Advanced Encryption Settings", classes="title")
             yield Rule()
             yield Label("LUKS cipher:")
-            yield Input(
+            cipher_options = [
+                ("aes-xts-plain64", "aes-xts-plain64"),
+                ("serpent-xts-plain64", "serpent-xts-plain64"),
+                ("twofish-xts-plain64", "twofish-xts-plain64"),
+            ]
+            yield Select(
+                cipher_options,
                 value=self.cfg.luks.cipher,
-                placeholder="e.g. serpent-xts-plain64, aes-xts-plain64",
                 id="cipher",
+                allow_blank=False,
             )
             yield Label("Key size (bits):")
-            yield Input(
-                value=str(self.cfg.luks.key_size),
-                placeholder="e.g. 256, 512",
+            key_size_options = [
+                ("256", 256),
+                ("512", 512),
+            ]
+            yield Select(
+                key_size_options,
+                value=self.cfg.luks.key_size,
                 id="key-size",
+                allow_blank=False,
             )
             yield Label("Hash:")
-            yield Input(
+            hash_options = [
+                ("sha256", "sha256"),
+                ("sha512", "sha512"),
+            ]
+            yield Select(
+                hash_options,
                 value=self.cfg.luks.hash,
-                placeholder="e.g. sha512, sha256",
                 id="hash",
+                allow_blank=False,
             )
             yield Label("Iteration time (ms):")
             yield Input(
@@ -535,15 +551,14 @@ class ArtixInstaller(App):
         cfg.disk.trim = self.query_one("#trim", Checkbox).value
 
         # Encryption
-        cipher = self.query_one("#cipher", Input).value.strip()
-        if cipher:
+        cipher = self.query_one("#cipher", Select).value
+        if cipher and cipher != Select.BLANK:
             cfg.luks.cipher = cipher
-        try:
-            cfg.luks.key_size = int(self.query_one("#key-size", Input).value)
-        except ValueError:
-            pass
-        hash_val = self.query_one("#hash", Input).value.strip()
-        if hash_val:
+        key_size = self.query_one("#key-size", Select).value
+        if key_size and key_size != Select.BLANK:
+            cfg.luks.key_size = key_size
+        hash_val = self.query_one("#hash", Select).value
+        if hash_val and hash_val != Select.BLANK:
             cfg.luks.hash = hash_val
         try:
             cfg.luks.iter_time = int(self.query_one("#iter-time", Input).value)
@@ -634,15 +649,7 @@ class ArtixInstaller(App):
         if not _valid_size(esp):
             errors.append("Disk: ESP size must be valid (e.g. 1G)")
 
-        # Encryption
-        if not self.query_one("#cipher", Input).value.strip():
-            errors.append("Advanced: cipher is required")
-        try:
-            int(self.query_one("#key-size", Input).value)
-        except ValueError:
-            errors.append("Advanced: key size must be a number")
-        if not self.query_one("#hash", Input).value.strip():
-            errors.append("Advanced: hash is required")
+        # Encryption (cipher, key-size, hash are non-blank selects)
         try:
             int(self.query_one("#iter-time", Input).value)
         except ValueError:

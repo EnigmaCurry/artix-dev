@@ -8,7 +8,7 @@ esp_size = "512M"
 trim = true
 
 [luks]
-cipher = "serpent-xts-plain64"
+cipher = "aes-xts-plain64"
 key_size = 512
 hash = "sha512"
 iter_time = 10000

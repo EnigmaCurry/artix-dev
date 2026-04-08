@@ -66,7 +66,7 @@ class DiskConfig:
 
 @dataclass
 class LuksConfig:
-    cipher: str = "serpent-xts-plain64"
+    cipher: str = "aes-xts-plain64"
     key_size: int = 512
     hash: str = "sha512"
     iter_time: int = 10000
