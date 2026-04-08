@@ -383,8 +383,8 @@ def run_phase2(cfg: InstallConfig, dry_run: bool = False) -> None:
     setup_libvirt(cfg)
     setup_nix(cfg)
     setup_desktop(cfg)
-    setup_user_dinit(cfg)
     setup_sway_home(cfg)
+    setup_user_dinit(cfg)
     setup_flatpak(cfg)
 
     # Remove phase 1 MOTD
