@@ -434,7 +434,8 @@ def unmount_and_finish() -> None:
     run("vgchange", "-an", "lvmSystem")
     run("cryptsetup", "luksClose", "lvm-system")
     run("sync")
-    print("\nInstallation complete. Remove the USB install media and reboot.")
+    print("\nInstallation complete. Reboot now and remove the USB"
+          "\nafter the machine reinitializes.")
 
 
 def run_phase1(cfg: InstallConfig, dry_run: bool = False,
