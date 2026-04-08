@@ -30,6 +30,8 @@ username = "user"
 kernel = "linux-hardened"
 caps_lock_remap = true
 tmpfs_size = "8G"
+git_name = ""
+git_email = ""
 ssh = "disable"
 ssh_authorized_keys = [
     # Paste your public key(s) here, one per line:
