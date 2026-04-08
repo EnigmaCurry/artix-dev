@@ -35,8 +35,16 @@ OPTIONAL_SERVICE_NAMES: dict[OptionalService, str] = {
 }
 
 
+def remove_pacman_lock() -> None:
+    lock = Path("/var/lib/pacman/db.lck")
+    if lock.exists():
+        heading("Removing stale pacman lock file")
+        lock.unlink()
+
+
 def install_live_deps() -> None:
     heading("Installing live environment dependencies")
+    remove_pacman_lock()
     run("pacman", "-Sy", "--noconfirm",
         "gptfdisk", "parted", "cryptsetup", "lvm2", "dosfstools")
 
