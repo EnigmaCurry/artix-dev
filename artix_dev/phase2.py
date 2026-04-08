@@ -225,9 +225,9 @@ def setup_desktop(cfg: InstallConfig) -> None:
                     "Exec=bash --login -c sway\n"
                     "Type=Application\n")
 
-    # Enable greetd
+    # Enable greetd for next boot (symlink directly to avoid starting now)
     if not _service_enabled("greetd"):
-        run("dinitctl", "enable", "greetd")
+        symlink("/etc/dinit.d/greetd", "/etc/dinit.d/boot.d/greetd")
 
     # pipewire-pulse user dinit service
     pp_service = "/etc/dinit.d/user/pipewire-pulse"
