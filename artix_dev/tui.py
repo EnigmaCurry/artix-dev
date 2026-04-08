@@ -150,9 +150,11 @@ class ArtixInstaller(App):
         dock: top;
         height: auto;
         align-horizontal: right;
+        margin-right: 2;
     }
     #top-nav Button {
         margin: 0 1;
+        min-width: 8;
     }
     #tab-nav-bar {
         height: auto;
