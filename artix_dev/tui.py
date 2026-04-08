@@ -62,24 +62,23 @@ def _valid_size(value: str) -> bool:
 def _list_disks() -> list[dict]:
     try:
         result = subprocess.run(
-            ["lsblk", "-dno", "NAME,SIZE,MODEL,TYPE"],
+            ["lsblk", "-Jdno", "NAME,SIZE,MODEL,TYPE"],
             capture_output=True, text=True,
         )
+        import json
+        data = json.loads(result.stdout)
         disks = []
-        for line in result.stdout.strip().splitlines():
-            parts = line.split(None, 3)
-            if len(parts) >= 2 and parts[-1].strip() == "disk":
-                name = parts[0]
-                size = parts[1]
-                model = parts[2] if len(parts) >= 4 else ""
+        for dev in data.get("blockdevices", []):
+            if dev.get("type") == "disk":
+                name = dev["name"]
                 disks.append({
                     "device": f"/dev/{name}",
-                    "size": size,
-                    "model": model,
+                    "size": dev.get("size", ""),
+                    "model": (dev.get("model") or "").strip(),
                     "type": DiskType.NVME if "nvme" in name else DiskType.OTHER,
                 })
         return disks
-    except FileNotFoundError:
+    except (FileNotFoundError, json.JSONDecodeError):
         return []
 
 
