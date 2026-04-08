@@ -45,7 +45,7 @@ def remove_pacman_lock() -> None:
 def install_live_deps() -> None:
     heading("Installing live environment dependencies")
     remove_pacman_lock()
-    run("pacman", "-S", "--noconfirm", "--needed",
+    run("pacman", "-Sy", "--noconfirm", "--needed",
         "gptfdisk", "parted", "cryptsetup", "lvm2", "dosfstools")
 
 
