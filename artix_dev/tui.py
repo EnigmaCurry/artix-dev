@@ -229,6 +229,12 @@ class ArtixInstaller(App):
         with VerticalScroll(id="welcome"):
             yield Label("Welcome to artix-dev", classes="title")
             yield Rule()
+            env_warnings = InstallConfig.validate_environment()
+            if env_warnings:
+                yield Label("Environment Warnings", classes="error-title")
+                for w in env_warnings:
+                    yield Static(f"[bold red]• {w}[/]")
+                yield Rule()
             yield Static(
                 "[italic]This is an unofficial community installer, not\n"
                 "affiliated with the Artix Linux project.[/]\n"

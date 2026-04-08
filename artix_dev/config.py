@@ -250,6 +250,50 @@ class InstallConfig:
 
         return errors
 
+    @staticmethod
+    def validate_environment() -> list[str]:
+        """Check environment prerequisites (live ISO, UEFI, network)."""
+        import os
+        import socket
+        errors: list[str] = []
+
+        # UEFI firmware
+        if not os.path.isdir("/sys/firmware/efi"):
+            errors.append(
+                "system is not booted in UEFI mode "
+                "(/sys/firmware/efi not found); GRUB UEFI install will fail"
+            )
+
+        # Network connectivity
+        try:
+            socket.create_connection(("archlinux.org", 443), timeout=5).close()
+        except OSError:
+            errors.append(
+                "no network connectivity (cannot reach archlinux.org); "
+                "pacman will not be able to download packages"
+            )
+
+        # Sanity: not running on an installed system
+        # Live ISOs typically mount root as tmpfs or overlayfs
+        try:
+            with open("/proc/mounts") as f:
+                for line in f:
+                    parts = line.split()
+                    if len(parts) >= 2 and parts[1] == "/":
+                        root_fs = parts[0]
+                        root_type = parts[2] if len(parts) >= 3 else ""
+                        if root_type not in ("tmpfs", "overlay", "overlayfs", "airootfs"):
+                            if root_fs.startswith("/dev/"):
+                                errors.append(
+                                    f"root filesystem is {root_fs} ({root_type}); "
+                                    f"this looks like an installed system, not a live ISO"
+                                )
+                    break
+        except OSError:
+            pass
+
+        return errors
+
     def validate_system(self) -> list[str]:
         """Validate against the live system (disk, UEFI, network, etc.)."""
         import os
@@ -257,6 +301,7 @@ class InstallConfig:
         import stat
         import subprocess
         errors = self.validate()
+        errors.extend(self.validate_environment())
         device = self.disk.device
 
         # Disk exists and is a block device
@@ -313,41 +358,6 @@ class InstallConfig:
                         )
             except (FileNotFoundError, ValueError):
                 pass
-
-        # UEFI firmware
-        if not os.path.isdir("/sys/firmware/efi"):
-            errors.append(
-                "system is not booted in UEFI mode "
-                "(/sys/firmware/efi not found); GRUB UEFI install will fail"
-            )
-
-        # Network connectivity
-        try:
-            socket.create_connection(("archlinux.org", 443), timeout=5).close()
-        except OSError:
-            errors.append(
-                "no network connectivity (cannot reach archlinux.org); "
-                "pacman will not be able to download packages"
-            )
-
-        # Sanity: not running on an installed system
-        # Live ISOs typically mount root as tmpfs or overlayfs
-        try:
-            with open("/proc/mounts") as f:
-                for line in f:
-                    parts = line.split()
-                    if len(parts) >= 2 and parts[1] == "/":
-                        root_fs = parts[0]
-                        root_type = parts[2] if len(parts) >= 3 else ""
-                        if root_type not in ("tmpfs", "overlay", "overlayfs", "airootfs"):
-                            if root_fs.startswith("/dev/"):
-                                errors.append(
-                                    f"root filesystem is {root_fs} ({root_type}); "
-                                    f"this looks like an installed system, not a live ISO"
-                                )
-                        break
-        except OSError:
-            pass
 
         return errors
 
