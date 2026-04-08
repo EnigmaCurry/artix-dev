@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+from zoneinfo import available_timezones
 
 from textual import on
 from textual.app import App, ComposeResult
@@ -24,6 +25,7 @@ from textual.widgets import (
     RadioButton,
     RadioSet,
     Rule,
+    Select,
     Static,
 )
 
@@ -348,10 +350,13 @@ class ArtixInstaller(App):
                 id="locale",
             )
             yield Label("Timezone:")
-            yield Input(
+            tz_list = sorted(available_timezones())
+            tz_options = [(tz, tz) for tz in tz_list]
+            yield Select(
+                tz_options,
                 value=self.cfg.system.timezone,
-                placeholder="e.g. US/Mountain, America/New_York, UTC",
                 id="timezone",
+                allow_blank=False,
             )
             yield Label("Tmpfs size (/tmp):")
             yield Input(
@@ -540,8 +545,8 @@ class ArtixInstaller(App):
         locale = self.query_one("#locale", Input).value.strip()
         if locale:
             cfg.system.locale = locale
-        timezone = self.query_one("#timezone", Input).value.strip()
-        if timezone:
+        timezone = self.query_one("#timezone", Select).value
+        if timezone and timezone != Select.BLANK:
             cfg.system.timezone = timezone
         tmpfs = self.query_one("#tmpfs-size", Input).value.strip()
         if tmpfs:
@@ -634,7 +639,8 @@ class ArtixInstaller(App):
             errors.append("System: invalid username")
         if not self.query_one("#locale", Input).value.strip():
             errors.append("System: locale is required")
-        if not self.query_one("#timezone", Input).value.strip():
+        tz_val = self.query_one("#timezone", Select).value
+        if not tz_val or tz_val == Select.BLANK:
             errors.append("System: timezone is required")
         tmpfs = self.query_one("#tmpfs-size", Input).value.strip()
         if not _valid_size(tmpfs):
