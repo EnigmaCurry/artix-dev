@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import locale
 import os
 import re
 import subprocess
@@ -344,10 +345,18 @@ class ArtixInstaller(App):
                 id="username",
             )
             yield Label("Locale:")
-            yield Input(
+            locale_set = set()
+            for val in locale.locale_alias.values():
+                base = val.split(".")[0]
+                if "_" in base and base[0].islower():
+                    locale_set.add(base + ".UTF-8")
+            locale_list = sorted(locale_set)
+            locale_options = [(loc, loc) for loc in locale_list]
+            yield Select(
+                locale_options,
                 value=self.cfg.system.locale,
-                placeholder="e.g. en_US.UTF-8",
                 id="locale",
+                allow_blank=False,
             )
             yield Label("Timezone:")
             tz_list = sorted(available_timezones())
@@ -542,9 +551,9 @@ class ArtixInstaller(App):
         username = self.query_one("#username", Input).value.strip()
         if username:
             cfg.system.username = username
-        locale = self.query_one("#locale", Input).value.strip()
-        if locale:
-            cfg.system.locale = locale
+        locale_val = self.query_one("#locale", Select).value
+        if locale_val and locale_val != Select.BLANK:
+            cfg.system.locale = locale_val
         timezone = self.query_one("#timezone", Select).value
         if timezone and timezone != Select.BLANK:
             cfg.system.timezone = timezone
@@ -637,7 +646,8 @@ class ArtixInstaller(App):
         username = self.query_one("#username", Input).value.strip()
         if not username or username == "root" or not re.match(r'^[a-z_][a-z0-9_-]*$', username):
             errors.append("System: invalid username")
-        if not self.query_one("#locale", Input).value.strip():
+        locale_val = self.query_one("#locale", Select).value
+        if not locale_val or locale_val == Select.BLANK:
             errors.append("System: locale is required")
         tz_val = self.query_one("#timezone", Select).value
         if not tz_val or tz_val == Select.BLANK:
