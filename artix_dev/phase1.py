@@ -414,15 +414,20 @@ def copy_artix_dev(cfg: InstallConfig, config_path: str | None, script_path: str
     if config_path and os.path.isfile(config_path):
         run("cp", config_path, "/mnt/root/artix-dev/config.orig.toml")
 
+    write_file("/mnt/usr/local/bin/artix-dev",
+               "#!/bin/sh\n"
+               'exec sudo python3 /root/artix-dev/artix-dev.pyz "$@"\n',
+               mode=0o755)
+
     write_file("/mnt/etc/motd",
                "\n"
-               "  ┌──────────────────────────────────────────────────────┐\n"
-               "  │  artix-dev: Phase 1 complete                         │\n"
-               "  │                                                      │\n"
-               "  │  To finish setup, run:                               │\n"
-               "  │    sudo python3 /root/artix-dev/artix-dev.pyz setup  │\n"
-               "  │                                                      │\n"
-               "  └──────────────────────────────────────────────────────┘\n"
+               "  ┌───────────────────────────────┐\n"
+               "  │  artix-dev: Phase 1 complete  │\n"
+               "  │                               │\n"
+               "  │  To finish setup, run:        │\n"
+               "  │    artix-dev setup            │\n"
+               "  │                               │\n"
+               "  └───────────────────────────────┘\n"
                "\n"
                )
 
