@@ -252,6 +252,9 @@ class ArtixInstaller(App):
         with VerticalScroll(id="disk"):
             yield Label("Select Target Disk", classes="title")
             yield Rule()
+            yield Static(
+                "[bold red]WARNING: all data on selected device will be deleted[/]"
+            )
             if self.disks:
                 saved = self.cfg.disk.device
                 match = next(
