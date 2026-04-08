@@ -205,6 +205,8 @@ class ArtixInstaller(App):
                 with Horizontal(id="top-nav"):
                     yield Button("Save and Exit", id="save")
                     yield Static("", classes="spacer")
+                    yield Button("Install", variant="primary", id="install")
+                    yield Static("", classes="spacer")
                     yield Button("Prev", id="prev")
                     yield Button("Next", variant="primary", id="next")
                 with ContentSwitcher(id="content", initial="welcome"):
@@ -484,11 +486,8 @@ class ArtixInstaller(App):
         with VerticalScroll(id="review"):
             yield Label("Review Configuration", classes="title")
             yield Rule()
-            yield Static("", id="toml-preview")
             yield Static("", id="validation-errors")
-            yield Rule()
-            with Center():
-                    yield Button("Install", variant="primary", id="install")
+            yield Static("", id="toml-preview")
 
     # --- Navigation ---
 
@@ -498,6 +497,7 @@ class ArtixInstaller(App):
         if tab_id:
             key = tab_id.removeprefix("tab-")
             self.query_one("#content", ContentSwitcher).current = key
+            self.query_one("#install").display = key == "review"
             if key == "review":
                 self._update_review()
 
@@ -507,6 +507,7 @@ class ArtixInstaller(App):
 
     def on_mount(self) -> None:
         self.query_one("#ssh-keys-section").display = self.cfg.system.ssh != SshPolicy.DISABLE
+        self.query_one("#install").display = False
 
     @on(RadioSet.Changed, "#ssh-policy")
     def ssh_policy_changed(self, event: RadioSet.Changed) -> None:
@@ -726,6 +727,7 @@ class ArtixInstaller(App):
             switcher.current = next_key
             nav = self.query_one("#nav", ListView)
             nav.index = idx + 1
+            self.query_one("#install").display = next_key == "review"
             if next_key == "review":
                 self._update_review()
 
@@ -743,6 +745,7 @@ class ArtixInstaller(App):
             switcher.current = prev_key
             nav = self.query_one("#nav", ListView)
             nav.index = idx - 1
+            self.query_one("#install").display = prev_key == "review"
             if prev_key == "review":
                 self._update_review()
 
