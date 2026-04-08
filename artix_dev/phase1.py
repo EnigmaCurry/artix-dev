@@ -95,6 +95,10 @@ def setup_luks(cfg: InstallConfig) -> None:
     luks = cfg.luks
     part = cfg.disk.luks_partition
 
+    # Ensure kernel crypto modules are loaded for dm-crypt
+    for mod in ("dm-crypt", "aes-generic", "xts"):
+        run("modprobe", mod, allow_fail=True)
+
     print("\n  Enter a secure passphrase for disk encryption.")
     print("  You will be prompted to enter it twice for verification.\n")
     run("cryptsetup",
