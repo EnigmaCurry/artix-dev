@@ -149,15 +149,16 @@ class ArtixInstaller(App):
     #top-nav {
         dock: top;
         height: auto;
-        align-horizontal: right;
         padding-right: 6;
     }
-    #top-nav Button {
+    #top-nav #save {
+        dock: left;
+        margin: 0 1;
+    }
+    #top-nav #prev, #top-nav #next {
+        dock: right;
         margin: 0 1;
         min-width: 8;
-    }
-    #tab-nav-bar {
-        height: auto;
     }
     Button {
         margin: 1 1;
@@ -195,8 +196,9 @@ class ArtixInstaller(App):
                 )
             with Vertical(id="main"):
                 with Horizontal(id="top-nav"):
-                    yield Button("Prev", id="prev")
+                    yield Button("Save and Exit", id="save")
                     yield Button("Next", variant="primary", id="next")
+                    yield Button("Prev", id="prev")
                 with ContentSwitcher(id="content", initial="welcome"):
                     yield from self._welcome_tab()
                     yield from self._disk_tab()
@@ -208,11 +210,6 @@ class ArtixInstaller(App):
                     yield from self._review_tab()
         yield Footer()
 
-    def _tab_nav(self) -> ComposeResult:
-        """Save and Exit button for each tab."""
-        yield Rule()
-        with Horizontal(id="tab-nav-bar"):
-            yield Button("Save and Exit", id="save")
 
     # --- Tab content ---
 
@@ -248,7 +245,7 @@ class ArtixInstaller(App):
                     variant="error",
                     id="delete-config",
                 )
-            yield from self._tab_nav()
+
 
     def _disk_tab(self) -> ComposeResult:
         with VerticalScroll(id="disk"):
@@ -294,7 +291,7 @@ class ArtixInstaller(App):
                 disabled=not has_swap,
                 id="swap-size",
             )
-            yield from self._tab_nav()
+
 
     def _advanced_tab(self) -> ComposeResult:
         with VerticalScroll(id="advanced"):
@@ -324,7 +321,7 @@ class ArtixInstaller(App):
                 placeholder="e.g. 10000",
                 id="iter-time",
             )
-            yield from self._tab_nav()
+
 
     def _system_tab(self) -> ComposeResult:
         with VerticalScroll(id="system"):
@@ -373,7 +370,7 @@ class ArtixInstaller(App):
                         k.value,
                         value=(k == self.cfg.system.kernel),
                     )
-            yield from self._tab_nav()
+
 
     def _ssh_tab(self) -> ComposeResult:
         with VerticalScroll(id="ssh"):
@@ -401,7 +398,7 @@ class ArtixInstaller(App):
                     placeholder="ssh-ed25519 AAAA... user@host",
                     id=f"ssh-key-{i}",
                 )
-            yield from self._tab_nav()
+
 
     def _features_tab(self) -> ComposeResult:
         with VerticalScroll(id="features"):
@@ -430,7 +427,7 @@ class ArtixInstaller(App):
                     value=(s in self.cfg.optional_services),
                     id=f"svc-{s.value}",
                 )
-            yield from self._tab_nav()
+
 
     def _extras_tab(self) -> ComposeResult:
         with VerticalScroll(id="extras"):
@@ -461,7 +458,7 @@ class ArtixInstaller(App):
                 placeholder="e.g. auto, 1920x1080",
                 id="grub-gfxmode",
             )
-            yield from self._tab_nav()
+
 
     def _review_tab(self) -> ComposeResult:
         with VerticalScroll(id="review"):
@@ -471,9 +468,7 @@ class ArtixInstaller(App):
             yield Static("", id="validation-errors")
             yield Rule()
             with Center():
-                with Horizontal():
                     yield Button("Install", variant="primary", id="install")
-                    yield Button("Save and Exit", id="save")
 
     # --- Navigation ---
 
