@@ -148,15 +148,16 @@ class ArtixInstaller(App):
     }
     #top-nav {
         dock: top;
-        height: auto;
+        height: 3;
         padding-right: 6;
     }
     #top-nav #save {
-        dock: left;
         margin: 0 1;
     }
+    #top-nav .spacer {
+        width: 1fr;
+    }
     #top-nav #prev, #top-nav #next {
-        dock: right;
         margin: 0 1;
         min-width: 8;
     }
@@ -197,8 +198,9 @@ class ArtixInstaller(App):
             with Vertical(id="main"):
                 with Horizontal(id="top-nav"):
                     yield Button("Save and Exit", id="save")
-                    yield Button("Next", variant="primary", id="next")
+                    yield Static("", classes="spacer")
                     yield Button("Prev", id="prev")
+                    yield Button("Next", variant="primary", id="next")
                 with ContentSwitcher(id="content", initial="welcome"):
                     yield from self._welcome_tab()
                     yield from self._disk_tab()
