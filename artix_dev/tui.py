@@ -648,6 +648,24 @@ class ArtixInstaller(App):
             disk_set = self.query_one("#disk-list", RadioSet)
             if disk_set.pressed_index < 0:
                 errors.append("Disk: select a target disk")
+            else:
+                device = self.disks[disk_set.pressed_index]["device"]
+                try:
+                    result = subprocess.run(
+                        ["lsblk", "-no", "MOUNTPOINT", device],
+                        capture_output=True, text=True,
+                    )
+                    mountpoints = [
+                        line.strip() for line in result.stdout.splitlines()
+                        if line.strip()
+                    ]
+                    if mountpoints:
+                        errors.append(
+                            f"Disk: {device} is in use "
+                            f"(mounted: {', '.join(mountpoints)})"
+                        )
+                except FileNotFoundError:
+                    pass
         else:
             errors.append("Disk: no disks available")
         esp = self.query_one("#esp-size", Input).value.strip()
