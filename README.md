@@ -43,7 +43,7 @@ python artix-dev.pyz install
 ```
 
 A TUI guides you through disk, encryption, system, SSH, and feature
-configuration. When ready, press **Install** to begin.
+configuration. When ready, press **Install** on the Review screen to begin.
 
 After phase 1 completes, reboot (remove the USB after the machine
 reinitializes). On first boot, log in and run:
