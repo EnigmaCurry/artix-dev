@@ -37,9 +37,9 @@ class Kernel(Enum):
 
 
 class SshPolicy(Enum):
-    ENABLE_KEYS_ONLY = "keys_only"  # sshd enabled, password auth disabled
-    ENABLE_PASSWORD = "password"  # sshd enabled, password auth allowed
     DISABLE = "disable"  # sshd not running
+    ENABLE_PASSWORD = "password"  # sshd enabled, password auth allowed
+    ENABLE_KEYS_ONLY = "keys_only"  # sshd enabled, password auth disabled
 
 
 @dataclass
@@ -127,7 +127,7 @@ class SystemConfig:
     kernel: Kernel = Kernel.HARDENED
     caps_lock_remap: bool = True
     tmpfs_size: str = ""
-    ssh: SshPolicy = SshPolicy.ENABLE_PASSWORD
+    ssh: SshPolicy = SshPolicy.DISABLE
     ssh_authorized_keys: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
@@ -481,7 +481,7 @@ class InstallConfig:
             kernel=Kernel(sys_data.get("kernel", Kernel.HARDENED.value)),
             caps_lock_remap=sys_data.get("caps_lock_remap", SystemConfig.caps_lock_remap),
             tmpfs_size=sys_data.get("tmpfs_size", SystemConfig.tmpfs_size),
-            ssh=SshPolicy(sys_data.get("ssh", SshPolicy.ENABLE_PASSWORD.value)),
+            ssh=SshPolicy(sys_data.get("ssh", SshPolicy.DISABLE.value)),
             ssh_authorized_keys=sys_data.get("ssh_authorized_keys", []),
         )
 

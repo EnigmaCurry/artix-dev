@@ -164,6 +164,9 @@ class ArtixInstaller(App):
         margin: 0 1;
         min-width: 8;
     }
+    #ssh-keys-section {
+        height: auto;
+    }
     Button {
         margin: 1 1;
     }
@@ -396,24 +399,25 @@ class ArtixInstaller(App):
             with RadioSet(id="ssh-policy"):
                 for p in SshPolicy:
                     labels = {
-                        "keys_only": "Keys only (disable password auth)",
-                        "password": "Password auth enabled",
                         "disable": "Disable SSH entirely",
+                        "password": "Password auth enabled",
+                        "keys_only": "Keys only (disable password auth)",
                     }
                     yield RadioButton(
                         labels[p.value],
                         value=(p == self.cfg.system.ssh),
                     )
-            yield Rule()
-            yield Label("Authorized public keys:")
-            for i in range(_NUM_KEY_SLOTS):
-                value = (self.cfg.system.ssh_authorized_keys[i]
-                         if i < len(self.cfg.system.ssh_authorized_keys) else "")
-                yield Input(
-                    value=value,
-                    placeholder="ssh-ed25519 AAAA... user@host",
-                    id=f"ssh-key-{i}",
-                )
+            with Vertical(id="ssh-keys-section"):
+                yield Rule()
+                yield Label("Authorized public keys:")
+                for i in range(_NUM_KEY_SLOTS):
+                    value = (self.cfg.system.ssh_authorized_keys[i]
+                             if i < len(self.cfg.system.ssh_authorized_keys) else "")
+                    yield Input(
+                        value=value,
+                        placeholder="ssh-ed25519 AAAA... user@host",
+                        id=f"ssh-key-{i}",
+                    )
 
 
     def _features_tab(self) -> ComposeResult:
@@ -500,6 +504,14 @@ class ArtixInstaller(App):
     @on(Checkbox.Changed, "#swap-enable")
     def swap_toggled(self, event: Checkbox.Changed) -> None:
         self.query_one("#swap-size", Input).disabled = not event.value
+
+    def on_mount(self) -> None:
+        self.query_one("#ssh-keys-section").display = self.cfg.system.ssh != SshPolicy.DISABLE
+
+    @on(RadioSet.Changed, "#ssh-policy")
+    def ssh_policy_changed(self, event: RadioSet.Changed) -> None:
+        policy = list(SshPolicy)[event.radio_set.pressed_index]
+        self.query_one("#ssh-keys-section").display = policy != SshPolicy.DISABLE
 
     def _collect_config(self) -> InstallConfig:
         """Read all form values into the config."""

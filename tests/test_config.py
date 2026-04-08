@@ -134,7 +134,7 @@ def test_toml_output_readable():
     assert "[packages]" in toml_text
     assert "[flatpak]" in toml_text
     assert 'kernel = "linux-hardened"' in toml_text
-    assert 'ssh = "password"' in toml_text
+    assert 'ssh = "disable"' in toml_text
     assert "ssh_authorized_keys" in toml_text
 
 
