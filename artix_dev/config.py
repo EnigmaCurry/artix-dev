@@ -288,7 +288,7 @@ class InstallConfig:
                                     f"root filesystem is {root_fs} ({root_type}); "
                                     f"this looks like an installed system, not a live ISO"
                                 )
-                    break
+                        break
         except OSError:
             pass
 
