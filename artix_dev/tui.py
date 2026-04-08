@@ -234,7 +234,7 @@ class ArtixInstaller(App):
                 "full configuration, then [bold]Install[/] to begin or\n"
                 "[bold]Save Config[/] to save for later.\n"
                 "\n"
-                "[bold]Ctrl+Q[/] to exit at any time.\n"
+                "Press [bold]Ctrl+Q[/] at anytime to exit without saving.\n"
             )
             if self.config_path and os.path.exists(self.config_path):
                 yield Rule()
