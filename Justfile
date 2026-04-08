@@ -13,9 +13,9 @@ build repo='':
     cp -r artix_dev build/app/
     # Stamp version with git SHA and repo URL
     printf 'VERSION = "%s"\nREPO = "%s"\nBUILD_TIME = "%s"\n' "$(git rev-parse --short HEAD)" "{{repo}}" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" > build/app/artix_dev/_version.py
-    # Install runtime deps (if any) into the bundle
-    uv export --no-dev --no-emit-project -o build/requirements.txt 2>/dev/null && \
-        uv pip install --target build/app -r build/requirements.txt 2>/dev/null || true
+    # Install runtime deps into the bundle
+    uv export --no-dev --no-emit-project -o build/requirements.txt
+    uv pip install --target build/app -r build/requirements.txt
     find build/app -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
     python3 -m zipapp build/app -o artix-dev.pyz -p "/usr/bin/env python3" -m "artix_dev.__main__:main"
     @echo "Built artix-dev.pyz ($(wc -c < artix-dev.pyz) bytes)"
