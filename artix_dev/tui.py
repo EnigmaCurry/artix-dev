@@ -776,6 +776,10 @@ class ArtixInstaller(App):
 
     @on(Button.Pressed, "#install")
     def do_install(self) -> None:
+        env_errors = InstallConfig.validate_environment()
+        if env_errors:
+            self.notify(env_errors[0], severity="error")
+            return
         errors = self._validate_all()
         if errors:
             self.notify("Fix validation errors before installing", severity="error")
