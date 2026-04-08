@@ -143,10 +143,13 @@ class ArtixInstaller(App):
     .error {
         color: $error;
     }
+    #main {
+        width: 1fr;
+    }
     #top-nav {
         dock: top;
         height: auto;
-        align: right top;
+        align-horizontal: right;
     }
     #top-nav Button {
         margin: 0 1;
@@ -181,9 +184,6 @@ class ArtixInstaller(App):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        with Horizontal(id="top-nav"):
-            yield Button("Previous", id="prev")
-            yield Button("Next", variant="primary", id="next")
         with Horizontal(id="layout"):
             with Vertical(id="sidebar"):
                 yield ListView(
@@ -191,14 +191,18 @@ class ArtixInstaller(App):
                       for key, label in TABS],
                     id="nav",
                 )
-            with ContentSwitcher(id="content", initial="welcome"):
-                yield from self._welcome_tab()
-                yield from self._disk_tab()
-                yield from self._system_tab()
-                yield from self._ssh_tab()
-                yield from self._features_tab()
-                yield from self._extras_tab()
-                yield from self._advanced_tab()
+            with Vertical(id="main"):
+                with Horizontal(id="top-nav"):
+                    yield Button("Previous", id="prev")
+                    yield Button("Next", variant="primary", id="next")
+                with ContentSwitcher(id="content", initial="welcome"):
+                    yield from self._welcome_tab()
+                    yield from self._disk_tab()
+                    yield from self._system_tab()
+                    yield from self._ssh_tab()
+                    yield from self._features_tab()
+                    yield from self._extras_tab()
+                    yield from self._advanced_tab()
                 yield from self._review_tab()
         yield Footer()
 
