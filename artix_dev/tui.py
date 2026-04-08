@@ -193,7 +193,7 @@ class ArtixInstaller(App):
         yield Rule()
         with Center():
             with Horizontal():
-                yield Button("Save", id="save")
+                yield Button("Save and Exit", id="save")
                 yield Button("Next", variant="primary", id="next")
 
     # --- Tab content ---
@@ -452,7 +452,7 @@ class ArtixInstaller(App):
             with Center():
                 with Horizontal():
                     yield Button("Install", variant="primary", id="install")
-                    yield Button("Save Config", id="save")
+                    yield Button("Save and Exit", id="save")
 
     # --- Navigation ---
 
