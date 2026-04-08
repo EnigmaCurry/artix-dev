@@ -129,7 +129,6 @@ class ArtixInstaller(App):
         width: 1fr;
     }
     #content > VerticalScroll {
-        max-width: 72;
         padding: 0 2;
     }
     .title {
