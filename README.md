@@ -71,7 +71,17 @@ You will enter your LUKS passphrase **twice** during boot:
 
 Once the drive is unlocked, dinit boots the rest of the system very
 quickly. Log in with the username and password you chose during
-installation, then run:
+installation.
+
+If you want to use SSH for phase 2, connect with your new username
+(the host key is retained from phase 1, so there should be no
+fingerprint warning):
+
+```bash
+ssh <username>@<ip-address>
+```
+
+Then run:
 
 ```bash
 artix-dev setup
