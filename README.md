@@ -21,7 +21,7 @@ nmtui
 Select **Activate a connection**, choose your WiFi SSID, enter the
 password, then quit nmtui.
 
-#### Remote install via SSH (optional)
+#### Remote install via SSH (optional; recommended)
 
 If you prefer to run the install from another machine (mouse support
 in the TUI, easier to copy/paste, scroll back, etc.), enable SSH on
