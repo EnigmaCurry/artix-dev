@@ -49,7 +49,7 @@ ssh artix@<ip-address>
 #### Run the installer
 
 ```bash
-curl -sLO https://github.com/EnigmaCurry/artix-dev/releases/download/latest/artix-dev.pyz
+curl -LO https://github.com/EnigmaCurry/artix-dev/releases/download/latest/artix-dev.pyz
 python artix-dev.pyz install
 ```
 
