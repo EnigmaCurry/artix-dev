@@ -10,12 +10,16 @@ project.
 
 ## Quick start
 
-Boot the [Artix base dinit ISO](https://artixlinux.org/download.php)
-and connect to the network:
+Boot the [Artix base dinit ISO](https://artixlinux.org/download.php).
+Log in with the default credentials (`artix` / `artix`), then connect
+to the network:
 
 ```bash
-nmtui    # connect to WiFi or configure ethernet
+nmtui
 ```
+
+Select **Activate a connection**, choose your WiFi SSID, enter the
+password, then quit nmtui.
 
 #### Remote install via SSH (optional)
 
