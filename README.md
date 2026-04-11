@@ -8,6 +8,12 @@ managed by [Nix home-manager](https://github.com/nix-community/home-manager).
 This is an unofficial community tool, not affiliated with the Artix Linux
 project.
 
+The desktop environment is configured by
+[sway-home](https://github.com/EnigmaCurry/sway-home), which is
+somewhat personalized for EnigmaCurry. To get full use out of this,
+you are expected to fork sway-home, make your own customizations, and
+enter your own GitHub URL in the artix-dev installer.
+
 ## Quick start
 
 Boot the [Artix base dinit ISO](https://artixlinux.org/download.php).
