@@ -56,8 +56,22 @@ python artix-dev.pyz install
 A TUI guides you through disk, encryption, system, SSH, and feature
 configuration. When ready, press **Install** on the Review screen to begin.
 
-After phase 1 completes, reboot (remove the USB after the machine
-reinitializes). On first boot, log in and run:
+After phase 1 completes, reboot and remove the USB drive after the
+machine reinitializes.
+
+## First boot
+
+You will enter your LUKS passphrase **twice** during boot:
+
+1. **GRUB unlock** — GRUB decrypts `/boot` to load the kernel. This is
+   slow (sometimes 30+ seconds); be patient and do not re-type your
+   passphrase.
+2. **Root filesystem unlock** — the kernel decrypts the LVM volumes.
+   This is much faster.
+
+Once the drive is unlocked, dinit boots the rest of the system very
+quickly. Log in with the username and password you chose during
+installation, then run:
 
 ```bash
 artix-dev setup
