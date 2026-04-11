@@ -12,7 +12,10 @@ The desktop environment is configured by
 [sway-home](https://github.com/EnigmaCurry/sway-home), which is
 somewhat personalized for EnigmaCurry. To get full use out of this,
 you are expected to fork sway-home, make your own customizations, and
-enter your own GitHub URL in the artix-dev installer.
+enter your own GitHub URL in the artix-dev installer. For demo
+purposes, you can use the default EnigmaCurry config as-is, but be
+aware that the upgrade tool (`hm-upgrade`) will be locked to
+EnigmaCurry's ongoing changes.
 
 ## Quick start
 
