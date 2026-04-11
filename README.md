@@ -21,6 +21,13 @@ nmtui
 Select **Activate a connection**, choose your WiFi SSID, enter the
 password, then quit nmtui.
 
+Sync the system clock (requires internet; takes less than a minute).
+TLS will fail if the clock is too far off:
+
+```bash
+sudo ntpd -qg
+```
+
 #### Remote install via SSH (optional; recommended)
 
 If you prefer to run the install from another machine (mouse support
