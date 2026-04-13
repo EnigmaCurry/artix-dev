@@ -180,7 +180,7 @@ def setup_desktop(cfg: InstallConfig) -> None:
 
     # Sway and friends
     sway_pkgs = [
-        "sway", "foot", "xorg-xwayland", "dunst", "libnotify",
+        "sway", "swaylock", "foot", "xorg-xwayland", "dunst", "libnotify",
         "lxsession", "ttf-font-awesome",
     ]
     audio_pkgs = [
